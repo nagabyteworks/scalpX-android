@@ -169,7 +169,12 @@ class ScalperViewModel(
             is ScalperIntent.ExitPosition -> handleExitPosition(intent)
             is ScalperIntent.PanicExitAll -> handlePanicExitAll()
 
-            is ScalperIntent.ConnectFlattrade -> handleConnectFlattrade()
+            is ScalperIntent.ConnectFlattrade -> openDailyOtpSheet()
+            is ScalperIntent.OpenDailyOtpSheet -> openDailyOtpSheet()
+            is ScalperIntent.DismissDailyOtpSheet -> dismissDailyOtpSheet()
+            is ScalperIntent.UpdateOtpDigits -> updateOtpDigits(intent.digits)
+            is ScalperIntent.SubmitDailyOtp -> submitDailyOtp()
+            is ScalperIntent.LaunchBrowserOAuthFallback -> handleLaunchBrowserOAuthFallback()
             is ScalperIntent.DismissAlert -> _uiState.update { it.copy(criticalAlert = null) }
             is ScalperIntent.RefreshHealth -> refreshHealth()
             is ScalperIntent.RefreshOptionChain -> refreshOptionChain()
@@ -339,7 +344,102 @@ class ScalperViewModel(
         }
     }
 
-    private fun handleConnectFlattrade() {
+    private fun openDailyOtpSheet() {
+        _uiState.update {
+            it.copy(
+                dailyOtpSheet = DailyOtpSheetState(
+                    isVisible = true,
+                    otpDigits = "",
+                    isSubmitting = false,
+                    errorMessage = null,
+                    suggestBrowserFallback = false
+                )
+            )
+        }
+    }
+
+    private fun dismissDailyOtpSheet() {
+        _uiState.update {
+            it.copy(
+                dailyOtpSheet = it.dailyOtpSheet.copy(
+                    isVisible = false,
+                    otpDigits = "",
+                    errorMessage = null
+                )
+            )
+        }
+    }
+
+    private fun updateOtpDigits(digits: String) {
+        val filtered = digits.filter { it.isDigit() }.take(6)
+        _uiState.update {
+            it.copy(
+                dailyOtpSheet = it.dailyOtpSheet.copy(
+                    otpDigits = filtered,
+                    errorMessage = null
+                )
+            )
+        }
+
+        if (filtered.length == 6 && !_uiState.value.dailyOtpSheet.isSubmitting) {
+            submitDailyOtp()
+        }
+    }
+
+    private fun submitDailyOtp() {
+        val currentOtp = _uiState.value.dailyOtpSheet.otpDigits
+        if (currentOtp.length != 6 || _uiState.value.dailyOtpSheet.isSubmitting) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                dailyOtpSheet = it.dailyOtpSheet.copy(
+                    isSubmitting = true,
+                    errorMessage = null
+                )
+            )
+        }
+
+        viewModelScope.launch {
+            when (val result = repository.submitDailyOtp(currentOtp)) {
+                is ApiResult.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            dailyOtpSheet = DailyOtpSheetState(isVisible = false, otpDigits = "")
+                        )
+                    }
+                    _uiEffect.emit(ScalperUiEffect.TriggerHaptic())
+                    _uiEffect.emit(ScalperUiEffect.ShowToast("Daily login successful"))
+                    refreshHealth()
+                    reconnectFeed()
+                    refreshOptionChain()
+                }
+                is ApiResult.Error -> {
+                    val isInvalidOtp = result.errorCode == "INVALID_OTP" || result.statusCode == 401
+                    val isFallback = result.errorCode == "FALLBACK_REQUIRED" || result.statusCode == 502
+
+                    _uiState.update { current ->
+                        current.copy(
+                            dailyOtpSheet = current.dailyOtpSheet.copy(
+                                isSubmitting = false,
+                                otpDigits = if (isInvalidOtp) "" else current.dailyOtpSheet.otpDigits,
+                                errorMessage = result.message,
+                                suggestBrowserFallback = if (isFallback) true else current.dailyOtpSheet.suggestBrowserFallback
+                            )
+                        )
+                    }
+
+                    if (isInvalidOtp) {
+                        _uiEffect.emit(ScalperUiEffect.TriggerHaptic(isImportant = true))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleLaunchBrowserOAuthFallback() {
+        dismissDailyOtpSheet()
         viewModelScope.launch {
             when (val result = repository.getLoginUrl()) {
                 is ApiResult.Success -> {

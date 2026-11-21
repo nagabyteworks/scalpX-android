@@ -200,6 +200,37 @@ class TradingApiTest {
         assertEquals("Panic exit executed for all open positions", exitAll.message)
     }
 
+    @Test
+    fun `dailyLogin submits OTP and receives DailyLoginResponse`() = runBlocking {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                    {
+                        "status": "ok",
+                        "message": "Daily Flattrade authentication successful",
+                        "brokerConnected": true,
+                        "tradeDate": "2026-11-21",
+                        "tokenGeneratedAt": "2026-11-21T09:15:00.000Z"
+                    }
+                """.trimIndent())
+        )
+
+        val response = tradingApi.dailyLogin(DailyLoginRequest(otp = "123456"))
+        assertTrue(response.isSuccessful)
+        val body = response.body()
+        assertNotNull(body)
+        assertEquals(true, body?.brokerConnected)
+        assertEquals("2026-11-21", body?.tradeDate)
+
+        val recorded = mockWebServer.takeRequest()
+        assertEquals("/api/auth/daily-login", recorded.path)
+        assertEquals("POST", recorded.method)
+        assertEquals("Bearer test-jwt-token-xyz", recorded.getHeader("Authorization"))
+        assertEquals("test-device-uuid-1234", recorded.getHeader("X-Device-Id"))
+    }
+
     private class FakeConfigStore(
         private var baseUrl: String,
         private var jwtToken: String?,

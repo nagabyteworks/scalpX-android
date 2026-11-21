@@ -2,7 +2,7 @@
 
 ## 1. Architecture & Core Invariant
 - **Server-Authoritative Thin Client:** Zero trading logic, zero ratcheting SL math, and zero direct Flattrade API calls on the phone. The Android app ONLY renders backend `TradingSnapshot` state and sends user intents.
-- **No Secrets on Device:** Flattrade `api_key`, `api_secret`, and session `jKey` NEVER touch the Android app. The phone stores only the backend Base URL, personal HS256 JWT, and a generated `X-Device-Id` inside Android Keystore-backed encrypted storage.
+- **No Secrets on Device:** Flattrade `user_id`, `password`, `api_key`, `api_secret`, and session `jKey` NEVER exist on Android. The user only types the ephemeral 6-digit OTP/TOTP once per morning, which is sent over HTTPS to `POST /api/auth/daily-login` and immediately cleared from memory. The phone stores only the backend Base URL, personal HS256 JWT, and a generated `X-Device-Id` inside Android Keystore-backed encrypted storage.
 - **Pattern:** Strict Unidirectional Data Flow (MVI) with immutable `StateFlow<ScalperUiState>` and one-shot `SharedFlow<UiEffect>`.
 
 ## 2. Tech Stack (Current Stable)
@@ -16,6 +16,7 @@
 - **Auth Headers:** Attach `Authorization: Bearer <JWT>` and `X-Device-Id: <uuid>` to every `/api/*` request and `/ws` handshake.
 - **REST Endpoints:**
   - `GET /health`
+  - `POST /api/auth/daily-login`
   - `GET /api/auth/login-url`
   - `GET /api/option-chain?symbol=NIFTY&expiry=...&strikes=10`
   - `POST /api/orders/one-click`
@@ -23,6 +24,7 @@
   - `POST /api/orders/exit-position`
   - `POST /api/orders/exit-all`
   - `GET /api/trades/today`
+- **Daily Login Flow:** `DailyOtpSheet` (native 6-digit OTP modal) is the primary daily login UI submitting to `POST /api/auth/daily-login`, and `GET /api/auth/login-url` + Chrome Custom Tab (`scalper://auth/success`) is retained only as a secondary fallback link inside the sheet.
 - **WebSocket (`/ws`):** Receives coalesced `TradingSnapshot` every 150 ms plus immediate priority events: `ORDER_FILLED`, `SL_RATCHETED`, `ORDER_REJECTED`, `FEED_STALE`, `MANUAL_INTERVENTION_REQUIRED`.
 - **OAuth Deep Link:** Handle `scalper://auth/success` after Chrome Custom Tab completes Flattrade login on the backend.
 

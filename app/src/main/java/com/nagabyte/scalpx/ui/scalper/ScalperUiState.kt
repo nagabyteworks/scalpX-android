@@ -56,6 +56,15 @@ data class CriticalAlertUi(
 )
 
 @Immutable
+data class DailyOtpSheetState(
+    val isVisible: Boolean = false,
+    val otpDigits: String = "",
+    val isSubmitting: Boolean = false,
+    val errorMessage: String? = null,
+    val suggestBrowserFallback: Boolean = false
+)
+
+@Immutable
 data class ScalperUiState(
     val brokerMode: String = "PAPER",
     val serverWsState: WsState = WsState.DISCONNECTED,
@@ -86,5 +95,6 @@ data class ScalperUiState(
     val isSettingsOpen: Boolean = false,
     val isTodayTradesOpen: Boolean = false,
     val editingPosition: ActivePositionUi? = null,
-    val todayTrades: ImmutableList<com.nagabyte.scalpx.data.remote.dto.LadderPositionDto> = persistentListOf()
+    val todayTrades: ImmutableList<com.nagabyte.scalpx.data.remote.dto.LadderPositionDto> = persistentListOf(),
+    val dailyOtpSheet: DailyOtpSheetState = DailyOtpSheetState()
 )

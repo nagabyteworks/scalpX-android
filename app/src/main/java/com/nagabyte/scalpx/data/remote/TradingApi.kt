@@ -5,6 +5,8 @@ import com.nagabyte.scalpx.data.remote.dto.*
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import retrofit2.http.*
@@ -17,6 +19,9 @@ interface TradingApi {
 
     @GET("/api/auth/login-url")
     suspend fun getLoginUrl(): LoginUrlResponse
+
+    @POST("api/auth/daily-login")
+    suspend fun dailyLogin(@Body request: DailyLoginRequest): Response<DailyLoginResponse>
 
     @GET("/api/option-chain")
     suspend fun getOptionChain(
@@ -57,11 +62,41 @@ interface TradingApi {
         }
 
         fun createOkHttpClient(configStore: ConfigStore): OkHttpClient {
+            val loggingInterceptor = object : okhttp3.Interceptor {
+                private val bodyLogger = HttpLoggingInterceptor().apply {
+                    level = if (com.nagabyte.scalpx.BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BODY
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                    redactHeader("Authorization")
+                }
+
+                private val headerOnlyLogger = HttpLoggingInterceptor().apply {
+                    level = if (com.nagabyte.scalpx.BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.HEADERS
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                    redactHeader("Authorization")
+                }
+
+                override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+                    val request = chain.request()
+                    return if (request.url.encodedPath.contains("api/auth/daily-login")) {
+                        headerOnlyLogger.intercept(chain)
+                    } else {
+                        bodyLogger.intercept(chain)
+                    }
+                }
+            }
+
             return OkHttpClient.Builder()
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(8, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS)
                 .addInterceptor(AuthInterceptor(configStore))
+                .addInterceptor(loggingInterceptor)
                 .build()
         }
 

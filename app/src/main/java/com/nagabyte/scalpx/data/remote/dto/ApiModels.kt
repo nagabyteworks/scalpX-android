@@ -21,6 +21,28 @@ data class LoginUrlResponse(
 )
 
 @Serializable
+data class DailyLoginRequest(
+    val otp: String
+)
+
+@Serializable
+data class DailyLoginResponse(
+    val brokerConnected: Boolean = true,
+    val tradeDate: String = "",
+    val tokenGeneratedAt: String = "",
+    val status: String? = null,
+    val message: String? = null
+)
+
+@Serializable
+data class ApiErrorResponse(
+    val error: String = "",
+    val message: String = "",
+    val remainingSec: Int? = null,
+    val fallbackRequired: Boolean = false
+)
+
+@Serializable
 data class OptionStrikeDto(
     val strikePrice: Double,
     val ceToken: String? = null,

@@ -43,6 +43,11 @@ sealed interface ScalperIntent {
     object PanicExitAll : ScalperIntent
 
     object ConnectFlattrade : ScalperIntent
+    object OpenDailyOtpSheet : ScalperIntent
+    object DismissDailyOtpSheet : ScalperIntent
+    data class UpdateOtpDigits(val digits: String) : ScalperIntent
+    object SubmitDailyOtp : ScalperIntent
+    object LaunchBrowserOAuthFallback : ScalperIntent
     object DismissAlert : ScalperIntent
 
     object RefreshHealth : ScalperIntent

@@ -8,6 +8,14 @@ interface ConfigStore {
     fun getDeviceId(): String
     fun clearAuth()
 
+    // Flattrade Broker Credentials (Personal Storage)
+    fun getFlattradePassword(): String? = null
+    fun setFlattradePassword(password: String?) {}
+    fun getFlattradeUserId(): String? = null
+    fun setFlattradeUserId(userId: String?) {}
+    fun getFlattradeAccessToken(): String? = null
+    fun setFlattradeAccessToken(token: String?) {}
+
     // Execution Presets
     fun getDefaultLots(): Int
     fun setDefaultLots(lots: Int)

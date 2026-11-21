@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import retrofit2.HttpException
@@ -23,7 +24,8 @@ sealed class ApiResult<out T> {
     data class Error(
         val message: String,
         val statusCode: Int? = null,
-        val cause: Throwable? = null
+        val cause: Throwable? = null,
+        val errorCode: String? = null
     ) : ApiResult<Nothing>()
 }
 
@@ -65,12 +67,14 @@ open class TradingRepository(
         }
     }
 
-    fun connectWebSocket() = wsClient.connect()
-    fun disconnectWebSocket() = wsClient.disconnect()
-    fun onNetworkAvailable() = wsClient.onNetworkAvailable()
+    open fun connectWebSocket() = wsClient.connect()
+    open fun disconnectWebSocket() = wsClient.disconnect()
+    open fun onNetworkAvailable() = wsClient.onNetworkAvailable()
 
     fun isUserAuthenticated(): Boolean = !configStore.getJwtToken().isNullOrBlank()
     fun saveJwtToken(token: String?) = configStore.setJwtToken(token)
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     open suspend fun checkHealth(): ApiResult<HealthDto> = safeApiCall {
         api.getHealth()
@@ -78,6 +82,55 @@ open class TradingRepository(
 
     open suspend fun getLoginUrl(): ApiResult<String> = safeApiCall {
         api.getLoginUrl().loginUrl
+    }
+
+    open suspend fun submitDailyOtp(otp: String): ApiResult<DailyLoginResponse> {
+        return try {
+            val response = api.dailyLogin(DailyLoginRequest(otp = otp))
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) {
+                    ApiResult.Success(body)
+                } else {
+                    ApiResult.Error("Empty response body from daily login", response.code())
+                }
+            } else {
+                val code = response.code()
+                val errorBodyStr = response.errorBody()?.string() ?: ""
+                var parsedError = ""
+                var fallbackRequired = false
+                try {
+                    val jsonElement = json.parseToJsonElement(errorBodyStr).jsonObject
+                    parsedError = jsonElement["error"]?.jsonPrimitive?.content
+                        ?: jsonElement["message"]?.jsonPrimitive?.content
+                        ?: errorBodyStr
+                    fallbackRequired = jsonElement["fallbackRequired"]?.jsonPrimitive?.content?.toBoolean() ?: false
+                } catch (_: Exception) {
+                    parsedError = errorBodyStr
+                }
+
+                val errorCode = when {
+                    code == 400 -> "INVALID_OTP_FORMAT"
+                    code == 401 -> "INVALID_OTP"
+                    code == 429 -> "LOGIN_RATE_LIMITED"
+                    code == 502 && (fallbackRequired || parsedError.contains("fallback", ignoreCase = true)) -> "FALLBACK_REQUIRED"
+                    code == 502 -> "FALLBACK_REQUIRED"
+                    else -> "BROKER_ERROR"
+                }
+
+                val displayMessage = if (parsedError.isNotBlank()) parsedError else "Login failed ($code)"
+                ApiResult.Error(
+                    message = displayMessage,
+                    statusCode = code,
+                    errorCode = errorCode
+                )
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(
+                message = e.localizedMessage ?: "Network error during daily login",
+                cause = e
+            )
+        }
     }
 
     open suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int = 10): ApiResult<OptionChainResponse> = safeApiCall {

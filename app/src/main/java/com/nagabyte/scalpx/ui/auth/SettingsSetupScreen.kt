@@ -41,6 +41,11 @@ fun SettingsSetupScreen(
     var jwtToken by remember { mutableStateOf(configStore.getJwtToken() ?: "") }
     var isTokenVisible by remember { mutableStateOf(false) }
 
+    var flattradeUserId by remember { mutableStateOf(configStore.getFlattradeUserId() ?: "") }
+    var flattradePassword by remember { mutableStateOf(configStore.getFlattradePassword() ?: "") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     var isTestingConnection by remember { mutableStateOf(false) }
     var healthResult by remember { mutableStateOf<HealthDto?>(null) }
     var healthError by remember { mutableStateOf<String?>(null) }
@@ -143,6 +148,109 @@ fun SettingsSetupScreen(
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     color = Color(0xFF6B7280)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Flattrade Broker Credentials Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1D27))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Flattrade Broker Password",
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    if (flattradePassword.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("Flattrade Password", flattradePassword)
+                                clipboard.setPrimaryClip(clip)
+                                android.widget.Toast.makeText(context, "Password copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text("COPY", color = Color(0xFF4C6EF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Saved securely in Android Keystore. Auto-copied to clipboard when launching OAuth.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF8E95A5)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "User ID",
+                    fontWeight = FontWeight.Medium,
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = flattradeUserId,
+                    onValueChange = { flattradeUserId = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("e.g. FT012345", color = Color.Gray, fontSize = 12.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.LightGray,
+                        focusedBorderColor = Color(0xFF4C6EF5),
+                        unfocusedBorderColor = Color(0xFF2C3242)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Password",
+                    fontWeight = FontWeight.Medium,
+                    color = Color.LightGray,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = flattradePassword,
+                    onValueChange = { flattradePassword = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("Enter your Flattrade password", color = Color.Gray, fontSize = 12.sp) },
+                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        TextButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                            Text(
+                                text = if (isPasswordVisible) "HIDE" else "SHOW",
+                                fontSize = 11.sp,
+                                color = Color(0xFF4C6EF5)
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.LightGray,
+                        focusedBorderColor = Color(0xFF4C6EF5),
+                        unfocusedBorderColor = Color(0xFF2C3242)
+                    )
                 )
             }
         }
@@ -267,6 +375,8 @@ fun SettingsSetupScreen(
                     focusManager.clearFocus()
                     configStore.setServerBaseUrl(baseUrl.trim())
                     configStore.setJwtToken(jwtToken.trim())
+                    configStore.setFlattradeUserId(flattradeUserId.trim().ifEmpty { null })
+                    configStore.setFlattradePassword(flattradePassword.ifEmpty { null })
                     statusMessage = "Configuration Saved!"
                     onSaved()
                 },

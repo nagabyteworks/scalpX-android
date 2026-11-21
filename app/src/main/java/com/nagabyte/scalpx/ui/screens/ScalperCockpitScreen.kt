@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nagabyte.scalpx.ui.auth.DailyOtpSheet
 import com.nagabyte.scalpx.ui.components.*
 import com.nagabyte.scalpx.ui.scalper.ScalperIntent
 import com.nagabyte.scalpx.ui.scalper.ScalperUiState
@@ -35,7 +36,7 @@ fun ScalperCockpitScreen(
                 brokerConnected = state.brokerConnected,
                 wsFeedHealthy = state.wsFeedHealthy,
                 pingMs = state.pingMs,
-                onConnectFlattrade = { onIntent(ScalperIntent.ConnectFlattrade) },
+                onConnectFlattrade = { onIntent(ScalperIntent.OpenDailyOtpSheet) },
                 onOpenTodayTrades = { onIntent(ScalperIntent.OpenTodayTrades) },
                 onOpenSettings = { onIntent(ScalperIntent.OpenSettings(true)) }
             )
@@ -158,6 +159,17 @@ fun ScalperCockpitScreen(
     }
 
     // Modal Bottom Sheets
+    if (state.dailyOtpSheet.isVisible) {
+        DailyOtpSheet(
+            sheetState = state.dailyOtpSheet,
+            brokerMode = state.brokerMode,
+            onOtpDigitsChanged = { onIntent(ScalperIntent.UpdateOtpDigits(it)) },
+            onSubmit = { onIntent(ScalperIntent.SubmitDailyOtp) },
+            onFallbackBrowserClick = { onIntent(ScalperIntent.LaunchBrowserOAuthFallback) },
+            onDismiss = { onIntent(ScalperIntent.DismissDailyOtpSheet) }
+        )
+    }
+
     if (state.isTodayTradesOpen) {
         TodayTradesBottomSheet(
             trades = state.todayTrades,

@@ -27,6 +27,9 @@ buildOutputCleanup/
 
 # Local configuration file (SDK location, etc)
 local.properties
+.env
+.env.*
+!.env.example
 
 # Log Files
 *.log
