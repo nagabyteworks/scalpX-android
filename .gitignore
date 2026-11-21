@@ -1,0 +1,60 @@
+# ==============================================================================
+# scalpX Android .gitignore
+# ==============================================================================
+
+# Built application files
+*.apk
+*.aar
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated build directories
+build/
+*/build/
+app/build/
+bin/
+gen/
+out/
+
+# Gradle files
+.gradle/
+buildOutputCleanup/
+
+# Local configuration file (SDK location, etc)
+local.properties
+
+# Log Files
+*.log
+
+# Android Studio navigation and captures
+.navigation/
+captures/
+
+# IntelliJ IDEA & Android Studio project files
+*.iml
+.idea/
+.idea/libraries/
+.idea/modules.xml
+.idea/xmlVersions.xml
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/caches/
+.idea/shelf/
+.idea/assetWizardSettings.xml
+
+# Keystore files
+*.jks
+*.keystore
+
+# External native build folder generated in Android Studio
+.externalNativeBuild/
+.cxx/
+
+# OS specific files
+.DS_Store
+Thumbs.db

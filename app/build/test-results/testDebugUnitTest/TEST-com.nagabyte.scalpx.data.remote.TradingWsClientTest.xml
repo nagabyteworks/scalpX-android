@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.nagabyte.scalpx.data.remote.TradingWsClientTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-21T10:56:47" hostname="DESKTOP-OSUVPUL" time="0.13">
-  <properties/>
-  <testcase name="wsClient emits high-priority events immediately" classname="com.nagabyte.scalpx.data.remote.TradingWsClientTest" time="0.11"/>
-  <testcase name="wsClient connects and receives 150ms TradingSnapshot" classname="com.nagabyte.scalpx.data.remote.TradingWsClientTest" time="0.019"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
