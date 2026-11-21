@@ -1,0 +1,19 @@
+{
+  "name": "scalpx-android",
+  "version": "1.0.0",
+  "description": "scalpX - Personal One-Click Options Scalper Android App",
+  "scripts": {
+    "start": "npm run run",
+    "run": "gradlew installDebug && adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
+    "run:phone": "gradlew installDebug && adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
+    "install": "gradlew installDebug",
+    "launch": "adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
+    "build": "gradlew assembleDebug",
+    "build:release": "gradlew assembleRelease",
+    "test": "gradlew testDebugUnitTest",
+    "clean": "gradlew clean",
+    "devices": "adb devices",
+    "reverse": "adb reverse tcp:3000 tcp:3000",
+    "logcat": "adb logcat -v time -s scalpX:V ScalperViewModel:V AndroidRuntime:E"
+  }
+}
