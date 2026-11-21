@@ -319,7 +319,9 @@ class ScalperViewModelTest {
             breakoutBufferPaise: Long,
             slippageBufferPaise: Long,
             firstMilestonePaise: Long?,
-            initialSlPoints: Double?
+            initialSlPoints: Double?,
+            side: String,
+            product: String
         ): ApiResult<LadderPositionDto> {
             oneClickOrderCallCount.incrementAndGet()
             lastSubmittedFirstMilestonePaise = firstMilestonePaise

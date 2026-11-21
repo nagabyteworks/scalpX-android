@@ -151,7 +151,9 @@ open class TradingRepository(
         breakoutBufferPaise: Long,
         slippageBufferPaise: Long,
         firstMilestonePaise: Long? = null,
-        initialSlPoints: Double? = null
+        initialSlPoints: Double? = null,
+        side: String = "BUY",
+        product: String = "I"
     ): ApiResult<LadderPositionDto> {
         val cooldownCheck = checkCooldown()
         if (cooldownCheck != null) return cooldownCheck
@@ -163,9 +165,10 @@ open class TradingRepository(
                 token = token,
                 tradingSymbol = symbol,
                 exchange = exchange,
+                side = side,
                 lots = lots,
                 lotSize = lotSize,
-                product = "I",
+                product = product,
                 initialSlPoints = initialSlPoints,
                 ladderConfig = LadderConfigDto(
                     firstMilestonePaise = firstMilestonePaise,

@@ -9,12 +9,31 @@ sealed interface ScalperIntent {
     data class SelectIndex(val index: String) : ScalperIntent
     data class SelectExpiry(val expiry: String) : ScalperIntent
     data class SelectStrike(val strike: Double) : ScalperIntent
+    data class SelectCallStrike(val strike: Double) : ScalperIntent
+    data class SelectPutStrike(val strike: Double) : ScalperIntent
+    data class StepStrike(val isCall: Boolean, val deltaSteps: Int) : ScalperIntent
+
     data class SelectLots(val lots: Int) : ScalperIntent
+    data class StepLots(val delta: Int) : ScalperIntent
     data class SelectProduct(val product: String) : ScalperIntent
+
+    data class ToggleOneClick(val enabled: Boolean) : ScalperIntent
+    data class ToggleZone2Collapse(val collapsed: Boolean) : ScalperIntent
+    data class SelectBookTab(val tab: BookTab) : ScalperIntent
+    data class ToggleTableView(val isTable: Boolean) : ScalperIntent
+    data class ToggleTheme(val isDark: Boolean) : ScalperIntent
+    data class OpenRatchetConfig(val open: Boolean) : ScalperIntent
 
     data class UpdateLadderDraft(val draft: LadderDraftUi) : ScalperIntent
 
     data class OneClickBuy(
+        val token: String,
+        val symbol: String,
+        val ltpPaise: Long,
+        val lotSize: Int = 25
+    ) : ScalperIntent
+
+    data class OneClickSell(
         val token: String,
         val symbol: String,
         val ltpPaise: Long,
@@ -41,6 +60,8 @@ sealed interface ScalperIntent {
 
     data class ExitPosition(val token: String) : ScalperIntent
     object PanicExitAll : ScalperIntent
+    object CancelAllOrders : ScalperIntent
+    object DismissConfirmation : ScalperIntent
 
     object ConnectFlattrade : ScalperIntent
     object OpenDailyOtpSheet : ScalperIntent

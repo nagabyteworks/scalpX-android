@@ -157,17 +157,33 @@ class ScalperViewModel(
         when (intent) {
             is ScalperIntent.SelectIndex -> selectIndex(intent.index)
             is ScalperIntent.SelectExpiry -> _uiState.update { it.copy(selectedExpiry = intent.expiry) }
-            is ScalperIntent.SelectStrike -> _uiState.update { it.copy(selectedStrike = intent.strike) }
+            is ScalperIntent.SelectStrike -> _uiState.update { it.copy(selectedStrike = intent.strike, selectedCallStrike = intent.strike, selectedPutStrike = intent.strike) }
+            is ScalperIntent.SelectCallStrike -> _uiState.update { it.copy(selectedCallStrike = intent.strike) }
+            is ScalperIntent.SelectPutStrike -> _uiState.update { it.copy(selectedPutStrike = intent.strike) }
+            is ScalperIntent.StepStrike -> stepStrike(intent.isCall, intent.deltaSteps)
+
             is ScalperIntent.SelectLots -> _uiState.update { it.copy(selectedLots = intent.lots) }
+            is ScalperIntent.StepLots -> stepLots(intent.delta)
             is ScalperIntent.SelectProduct -> _uiState.update { it.copy(product = intent.product) }
+
+            is ScalperIntent.ToggleOneClick -> _uiState.update { it.copy(oneClickEnabled = intent.enabled) }
+            is ScalperIntent.ToggleZone2Collapse -> _uiState.update { it.copy(isZone2Collapsed = intent.collapsed) }
+            is ScalperIntent.SelectBookTab -> _uiState.update { it.copy(activeTab = intent.tab) }
+            is ScalperIntent.ToggleTableView -> _uiState.update { it.copy(isTableView = intent.isTable) }
+            is ScalperIntent.ToggleTheme -> _uiState.update { it.copy(isDarkTheme = intent.isDark) }
+            is ScalperIntent.OpenRatchetConfig -> _uiState.update { it.copy(isRatchetConfigOpen = intent.open) }
+            is ScalperIntent.DismissConfirmation -> _uiState.update { it.copy(pendingConfirmation = null) }
+
             is ScalperIntent.UpdateLadderDraft -> _uiState.update { it.copy(ladderDraft = intent.draft) }
 
             is ScalperIntent.OneClickBuy -> handleOneClickBuy(intent)
+            is ScalperIntent.OneClickSell -> handleOneClickSell(intent)
             is ScalperIntent.AdjustMilestoneByDelta -> handleAdjustMilestone(intent)
             is ScalperIntent.UpdateLadderConfig -> handleUpdateLadderConfig(intent)
             is ScalperIntent.ToggleRatchetPause -> handleToggleRatchetPause(intent)
             is ScalperIntent.ExitPosition -> handleExitPosition(intent)
             is ScalperIntent.PanicExitAll -> handlePanicExitAll()
+            is ScalperIntent.CancelAllOrders -> handleCancelAllOrders()
 
             is ScalperIntent.ConnectFlattrade -> openDailyOtpSheet()
             is ScalperIntent.OpenDailyOtpSheet -> openDailyOtpSheet()
@@ -234,15 +250,126 @@ class ScalperViewModel(
                     is ApiResult.Success -> {
                         _uiEffect.emit(ScalperUiEffect.TriggerHaptic())
                         _uiEffect.emit(ScalperUiEffect.ShowToast("1-Click Entry Sent (${intent.symbol})"))
+                        _uiState.update {
+                            it.copy(
+                                lastServerMessage = "Buy order sent: ${intent.symbol}",
+                                lastServerMessageType = MessageType.SUCCESS
+                            )
+                        }
                     }
                     is ApiResult.Error -> {
                         _uiEffect.emit(ScalperUiEffect.ShowToast("Order Failed: ${result.message}"))
+                        _uiState.update {
+                            it.copy(
+                                lastServerMessage = "Order Failed: ${result.message}",
+                                lastServerMessageType = MessageType.ERROR
+                            )
+                        }
                     }
                 }
             } finally {
                 releaseActionLock(actionKey)
             }
         }
+    }
+
+    private fun handleOneClickSell(intent: ScalperIntent.OneClickSell) {
+        val actionKey = "SELL_${intent.token}"
+        if (!acquireActionLock(actionKey)) return
+
+        viewModelScope.launch {
+            try {
+                // If user holds an open position for this token, exit position
+                val openPos = _uiState.value.positions.find { it.token == intent.token && it.quantity > 0 }
+                if (openPos != null) {
+                    when (val result = repository.exitPosition(intent.token)) {
+                        is ApiResult.Success -> {
+                            _uiEffect.emit(ScalperUiEffect.TriggerHaptic())
+                            _uiEffect.emit(ScalperUiEffect.ShowToast("Exit Order Sent (${intent.symbol})"))
+                            _uiState.update {
+                                it.copy(
+                                    lastServerMessage = "Exit order placed for ${intent.symbol}",
+                                    lastServerMessageType = MessageType.SUCCESS
+                                )
+                            }
+                        }
+                        is ApiResult.Error -> {
+                            _uiEffect.emit(ScalperUiEffect.ShowToast("Sell Failed: ${result.message}"))
+                            _uiState.update {
+                                it.copy(
+                                    lastServerMessage = "Exit Failed: ${result.message}",
+                                    lastServerMessageType = MessageType.ERROR
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val draft = _uiState.value.ladderDraft
+                    val stepSizePaise = max(5L, MoneyFormatter.roundDownToTick((draft.stepPts * 100).toLong(), 5L))
+                    val breakoutBufferPaise = max(5L, MoneyFormatter.roundDownToTick((draft.breakoutBufferPts * 100).toLong(), 5L))
+                    val slippageBufferPaise = max(5L, MoneyFormatter.roundDownToTick((draft.slippageBufferPts * 100).toLong(), 5L))
+                    val productCode = if (_uiState.value.product.equals("NRML", ignoreCase = true)) "M" else "I"
+
+                    val result = repository.executeOneClickOrder(
+                        token = intent.token,
+                        symbol = intent.symbol,
+                        exchange = "NFO",
+                        lots = _uiState.value.selectedLots,
+                        lotSize = intent.lotSize,
+                        stepSizePaise = stepSizePaise,
+                        breakoutBufferPaise = breakoutBufferPaise,
+                        slippageBufferPaise = slippageBufferPaise,
+                        side = "SELL",
+                        product = productCode
+                    )
+
+                    when (result) {
+                        is ApiResult.Success -> {
+                            _uiEffect.emit(ScalperUiEffect.TriggerHaptic())
+                            _uiEffect.emit(ScalperUiEffect.ShowToast("1-Click Sell Sent (${intent.symbol})"))
+                            _uiState.update {
+                                it.copy(
+                                    lastServerMessage = "Sell order sent: ${intent.symbol}",
+                                    lastServerMessageType = MessageType.SUCCESS
+                                )
+                            }
+                        }
+                        is ApiResult.Error -> {
+                            _uiEffect.emit(ScalperUiEffect.ShowToast("Sell Failed: ${result.message}"))
+                            _uiState.update {
+                                it.copy(
+                                    lastServerMessage = "Sell Failed: ${result.message}",
+                                    lastServerMessageType = MessageType.ERROR
+                                )
+                            }
+                        }
+                    }
+                }
+            } finally {
+                releaseActionLock(actionKey)
+            }
+        }
+    }
+
+    private fun stepStrike(isCall: Boolean, deltaSteps: Int) {
+        val strikes = _uiState.value.strikes
+        if (strikes.isEmpty()) return
+        val currentStrike = if (isCall) {
+            _uiState.value.selectedCallStrike ?: _uiState.value.selectedStrike ?: strikes[strikes.size / 2].strikePrice
+        } else {
+            _uiState.value.selectedPutStrike ?: _uiState.value.selectedStrike ?: strikes[strikes.size / 2].strikePrice
+        }
+        val currentIndex = strikes.indexOfFirst { it.strikePrice == currentStrike }
+        val targetIndex = (if (currentIndex >= 0) currentIndex + deltaSteps else strikes.size / 2).coerceIn(0, strikes.size - 1)
+        val newStrike = strikes[targetIndex].strikePrice
+        _uiState.update {
+            if (isCall) it.copy(selectedCallStrike = newStrike) else it.copy(selectedPutStrike = newStrike)
+        }
+    }
+
+    private fun stepLots(delta: Int) {
+        val newLots = max(1, _uiState.value.selectedLots + delta)
+        _uiState.update { it.copy(selectedLots = newLots) }
     }
 
     private fun handleAdjustMilestone(intent: ScalperIntent.AdjustMilestoneByDelta) {
@@ -333,9 +460,54 @@ class ScalperViewModel(
                 when (val result = repository.panicExitAll()) {
                     is ApiResult.Success -> {
                         _uiEffect.emit(ScalperUiEffect.ShowToast("PANIC EXIT EXECUTED FOR ALL POSITIONS"))
+                        _uiState.update {
+                            it.copy(
+                                lastServerMessage = "Panic exit executed for all positions",
+                                lastServerMessageType = MessageType.SUCCESS
+                            )
+                        }
                     }
                     is ApiResult.Error -> {
                         _uiEffect.emit(ScalperUiEffect.ShowToast("Panic Exit Error: ${result.message}"))
+                        _uiState.update {
+                            it.copy(
+                                lastServerMessage = "Panic Exit Error: ${result.message}",
+                                lastServerMessageType = MessageType.ERROR
+                            )
+                        }
+                    }
+                }
+            } finally {
+                releaseActionLock(actionKey)
+            }
+        }
+    }
+
+    private fun handleCancelAllOrders() {
+        val actionKey = "CANCEL_ALL"
+        if (!acquireActionLock(actionKey)) return
+
+        viewModelScope.launch {
+            try {
+                _uiEffect.emit(ScalperUiEffect.TriggerHaptic(isImportant = true))
+                when (val result = repository.panicExitAll()) {
+                    is ApiResult.Success -> {
+                        _uiEffect.emit(ScalperUiEffect.ShowToast("ALL ORDERS CANCELLED"))
+                        _uiState.update {
+                            it.copy(
+                                lastServerMessage = "All orders cancelled successfully",
+                                lastServerMessageType = MessageType.INFO
+                            )
+                        }
+                    }
+                    is ApiResult.Error -> {
+                        _uiEffect.emit(ScalperUiEffect.ShowToast("Cancel Error: ${result.message}"))
+                        _uiState.update {
+                            it.copy(
+                                lastServerMessage = "Cancel Error: ${result.message}",
+                                lastServerMessageType = MessageType.ERROR
+                            )
+                        }
                     }
                 }
             } finally {
@@ -485,7 +657,8 @@ class ScalperViewModel(
                         it.copy(
                             brokerMode = h.brokerMode.uppercase(),
                             brokerConnected = h.brokerConnected,
-                            wsFeedHealthy = h.wsFeedHealthy
+                            wsFeedHealthy = h.wsFeedHealthy,
+                            userId = repository.configStore.getDeviceId()
                         )
                     }
                 }
@@ -523,11 +696,18 @@ class ScalperViewModel(
                         )
                     }.toPersistentList()
                     val defaultStrike = _uiState.value.selectedStrike ?: strikesList.getOrNull(strikesList.size / 2)?.strikePrice
+                    val callStrike = _uiState.value.selectedCallStrike ?: defaultStrike
+                    val putStrike = _uiState.value.selectedPutStrike ?: defaultStrike
+                    val spotPaise = defaultStrike?.let { (it * 100).toLong() } ?: 2452080L
+
                     _uiState.update {
                         it.copy(
                             selectedExpiry = result.data.expiry,
                             strikes = strikesList,
-                            selectedStrike = defaultStrike
+                            selectedStrike = defaultStrike,
+                            selectedCallStrike = callStrike,
+                            selectedPutStrike = putStrike,
+                            spotLtpPaise = spotPaise
                         )
                     }
                 }
