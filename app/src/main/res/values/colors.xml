@@ -1,0 +1,9 @@
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="bg_dark">#FF0E1117</color>
+    <color name="surface_dark">#FF1A1E29</color>
+    <color name="profit_green">#FF00C853</color>
+    <color name="loss_red">#FFFF1744</color>
+    <color name="amber_warning">#FFFFB300</color>
+</resources>

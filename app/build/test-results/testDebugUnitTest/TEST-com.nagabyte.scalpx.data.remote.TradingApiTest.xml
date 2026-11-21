@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.nagabyte.scalpx.data.remote.TradingApiTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-21T10:56:47" hostname="DESKTOP-OSUVPUL" time="0.445">
+  <properties/>
+  <testcase name="placeOneClickOrder sends exact payload and parses LadderPositionDto" classname="com.nagabyte.scalpx.data.remote.TradingApiTest" time="0.307"/>
+  <testcase name="patchLadder sends partial update and returns updated position" classname="com.nagabyte.scalpx.data.remote.TradingApiTest" time="0.038"/>
+  <testcase name="AuthInterceptor attaches Authorization Bearer and X-Device-Id headers" classname="com.nagabyte.scalpx.data.remote.TradingApiTest" time="0.068"/>
+  <testcase name="exitPosition and exitAll invoke correct endpoints" classname="com.nagabyte.scalpx.data.remote.TradingApiTest" time="0.032"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

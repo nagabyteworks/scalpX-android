@@ -1,0 +1,33 @@
+# Android Rules: Thin MVI One-Click Options Scalper
+
+## 1. Architecture & Core Invariant
+- **Server-Authoritative Thin Client:** Zero trading logic, zero ratcheting SL math, and zero direct Flattrade API calls on the phone. The Android app ONLY renders backend `TradingSnapshot` state and sends user intents.
+- **No Secrets on Device:** Flattrade `api_key`, `api_secret`, and session `jKey` NEVER touch the Android app. The phone stores only the backend Base URL, personal HS256 JWT, and a generated `X-Device-Id` inside Android Keystore-backed encrypted storage.
+- **Pattern:** Strict Unidirectional Data Flow (MVI) with immutable `StateFlow<ScalperUiState>` and one-shot `SharedFlow<UiEffect>`.
+
+## 2. Tech Stack (Current Stable)
+- **Language:** Kotlin 2.4.21
+- **UI:** Jetpack Compose BOM `2026.11.01` (Compose 1.13, Material 3 1.5), Dark-first high-contrast trading theme.
+- **Networking:** OkHttp (WebSockets + HTTP), Retrofit + `kotlinx.serialization` (JSON, `ignoreUnknownKeys = true`).
+- **Auth & Security:** AndroidX `Browser` (Chrome Custom Tabs for daily Flattrade OAuth), AndroidX `BiometricPrompt` (gate on resume).
+- **Concurrency:** Kotlin Coroutines + `StateFlow` / `SharedFlow`.
+
+## 3. Backend Contract Alignment (Must Match `docs/api-contract.md`)
+- **Auth Headers:** Attach `Authorization: Bearer <JWT>` and `X-Device-Id: <uuid>` to every `/api/*` request and `/ws` handshake.
+- **REST Endpoints:**
+  - `GET /health`
+  - `GET /api/auth/login-url`
+  - `GET /api/option-chain?symbol=NIFTY&expiry=...&strikes=10`
+  - `POST /api/orders/one-click`
+  - `PATCH /api/ladders/{token}`
+  - `POST /api/orders/exit-position`
+  - `POST /api/orders/exit-all`
+  - `GET /api/trades/today`
+- **WebSocket (`/ws`):** Receives coalesced `TradingSnapshot` every 150 ms plus immediate priority events: `ORDER_FILLED`, `SL_RATCHETED`, `ORDER_REJECTED`, `FEED_STALE`, `MANUAL_INTERVENTION_REQUIRED`.
+- **OAuth Deep Link:** Handle `scalper://auth/success` after Chrome Custom Tab completes Flattrade login on the backend.
+
+## 4. Trading UI & Financial Safety Rules
+- **Integer Paise Only:** All prices in DTOs and state are `Long` paise (`11005L` = `₹110.05`). Never use `Float` or `Double` for price arithmetic. Format to 2 decimals only at display time; align user-edited prices to multiples of 5 paise (`0.05`).
+- **Idempotency & Anti-Double-Tap:** Every mutating POST/PATCH must attach a fresh `commandId = UUID.randomUUID().toString()` and enforce a strict **500 ms client-side tap cooldown** on 1-click order buttons.
+- **Paper vs. Live Clarity:** Always display `brokerMode` from the server (`PAPER` in amber vs. `LIVE` in red) so the user can never confuse paper testing with live capital.
+- **Recomposition Discipline:** Mark all UI state models `@Immutable` and use stable keys (`token`) in lists so 150 ms snapshot updates never drop frames.
