@@ -364,6 +364,22 @@ class ScalperViewModelTest {
             )
         }
 
+        override suspend fun getAuthStatus(): ApiResult<AuthStatusResponse> = ApiResult.Success(
+            AuthStatusResponse(
+                status = if (healthBrokerConnected) "FEED_READY" else "WEBSOCKET_DISCONNECTED",
+                brokerConnected = healthBrokerConnected,
+                wsFeedHealthy = healthBrokerConnected,
+                wsFeedStatus = healthWsFeedStatus,
+                brokerMode = "paper",
+                tradingEnabled = healthTradingEnabled,
+                sessionValid = healthBrokerConnected,
+                wsTransportConnected = healthBrokerConnected,
+                wsAuthenticated = healthBrokerConnected,
+                marketDataReady = healthBrokerConnected,
+                accountStateUncertain = healthAccountStateUncertain
+            )
+        )
+
         override suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int): ApiResult<OptionChainResponse> {
             return ApiResult.Success(
                 OptionChainResponse(
@@ -473,6 +489,7 @@ class ScalperViewModelTest {
             private fun createDummyApi(): TradingApi = object : TradingApi {
                 override suspend fun provisionDevice(request: ProvisionDeviceRequest) = throw NotImplementedError()
                 override suspend fun getHealth() = throw NotImplementedError()
+                override suspend fun getAuthStatus() = throw NotImplementedError()
                 override suspend fun getLoginUrl() = throw NotImplementedError()
                 override suspend fun dailyLogin(request: DailyLoginRequest) = throw NotImplementedError()
                 override suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int) = throw NotImplementedError()

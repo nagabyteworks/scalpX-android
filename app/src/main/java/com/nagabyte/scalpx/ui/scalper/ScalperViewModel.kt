@@ -8,6 +8,7 @@ import com.nagabyte.scalpx.data.remote.WsConnectionState
 import com.nagabyte.scalpx.data.repository.ApiResult
 import com.nagabyte.scalpx.data.repository.TradingRepository
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
@@ -675,6 +676,8 @@ class ScalperViewModel(
                 // Spot and contract metadata must come from broker market/instrument data.
                 // Clear the prior index value so an old spot cannot select the wrong ATM.
                 spotLtpPaise = 0L,
+                strikes = persistentListOf(),
+                selectedExpiry = "",
                 selectedStrike = null,
                 selectedCallStrike = null,
                 selectedPutStrike = null
@@ -695,10 +698,11 @@ class ScalperViewModel(
                             wsFeedHealthy = s.wsFeedHealthy,
                             tradingEnabled = s.tradingEnabled,
                             wsFeedStatus = s.wsFeedStatus,
+                            accountStateUncertain = s.accountStateUncertain,
                             userId = repository.configStore.getDeviceId()
                         )
                     }
-                    if (!s.brokerConnected && !_uiState.value.dailyOtpSheet.isVisible) {
+                    if (s.brokerMode.equals("live", ignoreCase = true) && !s.sessionValid && !_uiState.value.dailyOtpSheet.isVisible) {
                         openDailyOtpSheet()
                     }
                 }
@@ -760,16 +764,14 @@ class ScalperViewModel(
                         )
                     }.toPersistentList()
 
-                    // Automatically calculate ATM strike based on current spot LTP
-                    val currentSpotPaise = _uiState.value.spotLtpPaise
-                    val spotPrice = currentSpotPaise / 100.0
-                    val atmStrike = if (strikesList.isNotEmpty() && currentSpotPaise > 0L) {
-                        strikesList.minByOrNull { kotlin.math.abs(it.strikePrice - spotPrice) }?.strikePrice
-                    } else null
-
-                    val defaultStrike = _uiState.value.selectedStrike ?: atmStrike
-                    val callStrike = _uiState.value.selectedCallStrike ?: atmStrike ?: defaultStrike
-                    val putStrike = _uiState.value.selectedPutStrike ?: atmStrike ?: defaultStrike
+                    // ATM is selected only when the backend validated it against fresh spot
+                    // data and complete CE/PE contracts. Never infer it from stale UI state.
+                    val atmStrike = result.data.atmStrike?.takeIf { strike ->
+                        strikesList.any { it.strikePrice == strike && !it.ceToken.isNullOrBlank() && !it.peToken.isNullOrBlank() }
+                    }
+                    val defaultStrike = _uiState.value.selectedStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected } } ?: atmStrike
+                    val callStrike = _uiState.value.selectedCallStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected && !it.ceToken.isNullOrBlank() } } ?: atmStrike
+                    val putStrike = _uiState.value.selectedPutStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected && !it.peToken.isNullOrBlank() } } ?: atmStrike
 
                     _uiState.update {
                         it.copy(
@@ -782,7 +784,9 @@ class ScalperViewModel(
                     }
                 }
                 is ApiResult.Error -> {
-                    // Retain existing chain
+                    _uiState.update {
+                        it.copy(strikes = persistentListOf(), selectedStrike = null, selectedCallStrike = null, selectedPutStrike = null)
+                    }
                 }
             }
         }

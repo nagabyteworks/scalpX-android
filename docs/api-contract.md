@@ -74,14 +74,18 @@ scalpX is a server-authoritative one-click options execution and ratcheting stop
 ### 3.3 Check Authentication & Readiness Status
 - **Method & Path:** `GET /api/auth/status`
 - **Auth:** Required (`Authorization: Bearer <JWT>`, `X-Device-Id: <UUID>`)
-- **Description:** Returns the current Flattrade authentication progress and feed readiness (`AUTHENTICATION_REQUIRED`, `AUTHENTICATING`, `AUTHENTICATED`, `WEBSOCKET_CONNECTING`, `FEED_READY`, `AUTHENTICATION_FAILED`).
+- **Description:** Separately reports broker session validity, WebSocket transport, WebSocket authentication, and fresh market data for all active subscriptions. `FEED_READY` means the subscribed instruments have all produced fresh ticks. Paper mode is explicitly simulated and never reports a live broker connection.
 - **Response `200 OK`:**
 ```json
 {
-  "status": "FEED_READY",
+  "status": "AUTHENTICATED",
   "brokerConnected": true,
-  "wsFeedHealthy": true,
+  "wsFeedHealthy": false,
   "wsFeedStatus": "CONNECTED",
+  "sessionValid": true,
+  "wsTransportConnected": true,
+  "wsAuthenticated": true,
+  "marketDataReady": false,
   "tradeDate": "2026-11-22",
   "brokerMode": "live",
   "tradingEnabled": false
@@ -90,7 +94,7 @@ scalpX is a server-authoritative one-click options execution and ratcheting stop
 
 ### 3.4 Get Option Chain
 - **Method & Path:** `GET /api/option-chain?symbol=SENSEX&strikes=10`
-- **Description:** Returns available option chain strikes and contract details for SENSEX (BFO) or NIFTY/BANKNIFTY (NFO).
+- **Description:** Returns broker validated option contracts. The client only uses backend provided ATM and does not calculate ATM from cached spot values. Paper mode returns no fabricated contracts. LIVE currently responds `503` until authoritative instrument-master/index-token data is configured in the backend.
 
 ### 3.5 One-Click Order Execution
 - **Method & Path:** `POST /api/orders/one-click`

@@ -130,8 +130,8 @@ data class ScalperUiState(
     val product: String = "MIS",
 
     val spotLtpPaise: Long = 0L,
-    val spotChangePts: Double = 120.50,
-    val spotChangePercent: Double = 0.15,
+    val spotChangePts: Double = 0.0,
+    val spotChangePercent: Double = 0.0,
 
     val oneClickEnabled: Boolean = true,
     val isZone2Collapsed: Boolean = false,

@@ -60,7 +60,12 @@ data class AuthStatusResponse(
     val wsFeedStatus: String = "FEED_DISCONNECTED",
     val tradeDate: String? = null,
     val brokerMode: String? = null,
-    val tradingEnabled: Boolean = false
+    val tradingEnabled: Boolean = false,
+    val sessionValid: Boolean = false,
+    val wsTransportConnected: Boolean = false,
+    val wsAuthenticated: Boolean = false,
+    val marketDataReady: Boolean = false,
+    val accountStateUncertain: Boolean = false
 )
 
 @Serializable
@@ -86,7 +91,10 @@ data class OptionStrikeDto(
 data class OptionChainResponse(
     val symbol: String,
     val expiry: String,
-    val strikes: List<OptionStrikeDto> = emptyList()
+    val strikes: List<OptionStrikeDto> = emptyList(),
+    val atmStrike: Double? = null,
+    val dataSource: String? = null,
+    val simulated: Boolean = false
 )
 
 @Serializable
