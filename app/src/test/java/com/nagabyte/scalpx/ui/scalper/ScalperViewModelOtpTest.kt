@@ -200,7 +200,8 @@ class ScalperViewModelOtpTest {
         override suspend fun getAuthStatus(): ApiResult<AuthStatusResponse> = ApiResult.Success(
             AuthStatusResponse(status = "FEED_READY", brokerConnected = true, wsFeedHealthy = true,
                 wsFeedStatus = "CONNECTED", brokerMode = "live", tradingEnabled = true,
-                sessionValid = true, wsTransportConnected = true, wsAuthenticated = true, marketDataReady = true)
+                sessionTokenPresent = true, sessionValid = true, sessionValidity = "VALID",
+                wsTransportConnected = true, wsAuthenticated = true, marketDataReady = true)
         )
 
         override suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int): ApiResult<OptionChainResponse> {

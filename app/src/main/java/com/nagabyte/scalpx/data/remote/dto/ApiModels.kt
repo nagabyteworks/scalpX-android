@@ -16,6 +16,9 @@ data class HealthDto(
     val tradingEnabled: Boolean = false,
     val wsFeedStatus: String = "UNKNOWN",
     val accountStateUncertain: Boolean = false,
+    val sessionTokenPresent: Boolean = false,
+    val sessionValid: Boolean = false,
+    val sessionValidity: String = "UNKNOWN",
     val timestamp: String? = null
 )
 
@@ -61,7 +64,9 @@ data class AuthStatusResponse(
     val tradeDate: String? = null,
     val brokerMode: String? = null,
     val tradingEnabled: Boolean = false,
+    val sessionTokenPresent: Boolean = false,
     val sessionValid: Boolean = false,
+    val sessionValidity: String = "UNKNOWN",
     val wsTransportConnected: Boolean = false,
     val wsAuthenticated: Boolean = false,
     val marketDataReady: Boolean = false,

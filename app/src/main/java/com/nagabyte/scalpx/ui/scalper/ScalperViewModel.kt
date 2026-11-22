@@ -695,6 +695,9 @@ class ScalperViewModel(
                         it.copy(
                             brokerMode = (s.brokerMode ?: "LIVE").uppercase(),
                             brokerConnected = s.brokerConnected,
+                            sessionTokenPresent = s.sessionTokenPresent,
+                            sessionValid = s.sessionValid,
+                            sessionValidity = s.sessionValidity,
                             wsFeedHealthy = s.wsFeedHealthy,
                             tradingEnabled = s.tradingEnabled,
                             wsFeedStatus = s.wsFeedStatus,
@@ -702,7 +705,7 @@ class ScalperViewModel(
                             userId = repository.configStore.getDeviceId()
                         )
                     }
-                    if (s.brokerMode.equals("live", ignoreCase = true) && !s.sessionValid && !_uiState.value.dailyOtpSheet.isVisible) {
+                    if (s.brokerMode.equals("live", ignoreCase = true) && s.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
                         openDailyOtpSheet()
                     }
                 }
@@ -719,10 +722,13 @@ class ScalperViewModel(
                                     tradingEnabled = h.tradingEnabled,
                                     wsFeedStatus = h.wsFeedStatus,
                                     accountStateUncertain = h.accountStateUncertain,
+                                    sessionTokenPresent = h.sessionTokenPresent,
+                                    sessionValid = h.sessionValid,
+                                    sessionValidity = h.sessionValidity,
                                     userId = repository.configStore.getDeviceId()
                                 )
                             }
-                            if (!h.brokerConnected && !_uiState.value.dailyOtpSheet.isVisible) {
+                            if (h.brokerMode.equals("live", ignoreCase = true) && h.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
                                 openDailyOtpSheet()
                             }
                         }
@@ -730,6 +736,8 @@ class ScalperViewModel(
                             _uiState.update {
                                 it.copy(
                                     brokerConnected = false,
+                                    sessionValid = false,
+                                    sessionValidity = "UNKNOWN",
                                     wsFeedHealthy = false,
                                     tradingEnabled = false,
                                     wsFeedStatus = "OFFLINE"

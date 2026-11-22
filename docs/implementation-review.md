@@ -7,6 +7,8 @@ scalpX Android is a server-authoritative MVI cockpit for a single-user options s
 ## Changes in this review
 
 - Auth status DTOs distinguish broker session validity, socket transport, broker socket authentication, and fresh market data.
+- Token presence is displayed separately from validation. Android opens the authentication sheet only when the backend returns `sessionValidity=INVALID`; a temporary broker validation failure remains `UNKNOWN` and does not falsely request a new login.
+- The UI consumes exchange-aware session state and never equates a locally stored token with a connected or ready broker.
 - Automatic ATM inference from the Android spot display was removed. The app uses ATM only when the backend supplies it and the matching strike has both CE and PE tokens.
 - Changing the selected index clears the old spot, expiry, and option contracts. Failed chain requests clear stale contracts as well.
 - Initial spot-change state is neutral instead of fabricated.

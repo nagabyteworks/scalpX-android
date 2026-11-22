@@ -74,7 +74,7 @@ scalpX is a server-authoritative one-click options execution and ratcheting stop
 ### 3.3 Check Authentication & Readiness Status
 - **Method & Path:** `GET /api/auth/status`
 - **Auth:** Required (`Authorization: Bearer <JWT>`, `X-Device-Id: <UUID>`)
-- **Description:** Separately reports broker session validity, WebSocket transport, WebSocket authentication, and fresh market data for all active subscriptions. `FEED_READY` means the subscribed instruments have all produced fresh ticks. Paper mode is explicitly simulated and never reports a live broker connection.
+- **Description:** Separately reports token presence and broker validated session validity, WebSocket transport, WebSocket authentication, and fresh market data for active subscriptions. `sessionValidity` is `VALID`, `INVALID`, `UNKNOWN`, or `SIMULATED`; Android requests login only for an actually invalid LIVE session. `FEED_READY` means all subscribed instruments have fresh ticks. Paper mode is explicitly simulated and never reports a live broker connection.
 - **Response `200 OK`:**
 ```json
 {

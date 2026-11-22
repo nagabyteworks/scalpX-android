@@ -312,6 +312,20 @@ class ScalperViewModelTest {
         assertEquals("Order must NOT be dispatched when broker is disconnected", 0, fakeRepo.oneClickOrderCallCount.get())
     }
 
+    @Test
+    fun `stored but invalid session opens authentication sheet`() = runTest(testDispatcher) {
+        fakeRepo.healthBrokerConnected = false
+        fakeRepo.healthSessionValidity = "INVALID"
+        fakeRepo.healthBrokerMode = "live"
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.sessionTokenPresent)
+        assertFalse(viewModel.uiState.value.sessionValid)
+        assertEquals("INVALID", viewModel.uiState.value.sessionValidity)
+        assertTrue(viewModel.uiState.value.dailyOtpSheet.isVisible)
+    }
+
     private class FakeTradingRepository : TradingRepository(
         api = createDummyApi(),
         wsClient = createDummyWsClient(),
@@ -324,6 +338,8 @@ class ScalperViewModelTest {
 
         var healthTradingEnabled = true
         var healthBrokerConnected = true
+        var healthSessionValidity = "VALID"
+        var healthBrokerMode = "paper"
         var healthAccountStateUncertain = false
         var healthWsFeedStatus = "FEED_CONNECTED"
 
@@ -370,9 +386,11 @@ class ScalperViewModelTest {
                 brokerConnected = healthBrokerConnected,
                 wsFeedHealthy = healthBrokerConnected,
                 wsFeedStatus = healthWsFeedStatus,
-                brokerMode = "paper",
+                brokerMode = healthBrokerMode,
                 tradingEnabled = healthTradingEnabled,
+                sessionTokenPresent = true,
                 sessionValid = healthBrokerConnected,
+                sessionValidity = if (healthBrokerConnected) "VALID" else healthSessionValidity,
                 wsTransportConnected = healthBrokerConnected,
                 wsAuthenticated = healthBrokerConnected,
                 marketDataReady = healthBrokerConnected,
