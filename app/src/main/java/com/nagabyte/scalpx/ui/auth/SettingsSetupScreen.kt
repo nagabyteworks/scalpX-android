@@ -50,11 +50,18 @@ fun SettingsSetupScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     var appConfig by remember { mutableStateOf<AppConfigDto?>(null) }
-    var backendOnline by remember { mutableStateOf<Boolean?>(null) }
+    var backendStatus by remember { mutableStateOf("Checking") }
 
     LaunchedEffect(Unit) {
         while (true) {
-            backendOnline = repository.checkHealth() is ApiResult.Success
+            backendStatus = when (val health = repository.checkHealth()) {
+                is ApiResult.Success -> "Online"
+                is ApiResult.Error -> when (health.statusCode) {
+                    502, 503, 504 -> "Gateway error (HTTP ${health.statusCode})"
+                    null -> "Network unavailable"
+                    else -> "HTTP error (${health.statusCode})"
+                }
+            }
             if (authenticated) {
                 appConfig = (repository.getAppConfig() as? ApiResult.Success)?.data
             }
@@ -70,7 +77,7 @@ fun SettingsSetupScreen(
         Text("scalpX", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White)
         Text("LIVE trading cockpit", fontSize = 13.sp, color = Color(0xFF9AA4B2))
 
-        StatusCard("Backend", if (backendOnline == true) "Online" else if (backendOnline == false) "Unavailable" else "Checking")
+        StatusCard("Backend", backendStatus)
 
         if (!authenticated) {
             Text("Authenticate device", color = Color.White, fontWeight = FontWeight.SemiBold)
