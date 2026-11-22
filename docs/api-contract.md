@@ -71,11 +71,28 @@ scalpX is a server-authoritative one-click options execution and ratcheting stop
   - `400 Bad Request`: `{ "error": "OTP must be a 6-digit numeric string" }`
   - `401 Unauthorized`: `{ "error": "Flattrade authentication failed: Invalid OTP or session expired" }`
 
-### 3.2 Get Option Chain
-- **Method & Path:** `GET /api/option-chain?symbol=NIFTY&strikes=10`
-- **Response `200 OK`:** Returns available option chain strikes and Greeks.
+### 3.3 Check Authentication & Readiness Status
+- **Method & Path:** `GET /api/auth/status`
+- **Auth:** Required (`Authorization: Bearer <JWT>`, `X-Device-Id: <UUID>`)
+- **Description:** Returns the current Flattrade authentication progress and feed readiness (`AUTHENTICATION_REQUIRED`, `AUTHENTICATING`, `AUTHENTICATED`, `WEBSOCKET_CONNECTING`, `FEED_READY`, `AUTHENTICATION_FAILED`).
+- **Response `200 OK`:**
+```json
+{
+  "status": "FEED_READY",
+  "brokerConnected": true,
+  "wsFeedHealthy": true,
+  "wsFeedStatus": "CONNECTED",
+  "tradeDate": "2026-11-22",
+  "brokerMode": "live",
+  "tradingEnabled": false
+}
+```
 
-### 3.3 One-Click Order Execution
+### 3.4 Get Option Chain
+- **Method & Path:** `GET /api/option-chain?symbol=SENSEX&strikes=10`
+- **Description:** Returns available option chain strikes and contract details for SENSEX (BFO) or NIFTY/BANKNIFTY (NFO).
+
+### 3.5 One-Click Order Execution
 - **Method & Path:** `POST /api/orders/one-click`
 - **Headers:** `Authorization: Bearer <JWT>`, `X-Device-Id: <UUID>`
 - **Request Body:**

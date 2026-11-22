@@ -669,40 +669,69 @@ class ScalperViewModel(
     }
 
     private fun selectIndex(index: String) {
-        val lotSize = when (index) {
-            "BANKNIFTY" -> 15
-            "SENSEX" -> 10
-            else -> 25 // NIFTY
+        _uiState.update {
+            it.copy(
+                selectedIndex = index,
+                // Spot and contract metadata must come from broker market/instrument data.
+                // Clear the prior index value so an old spot cannot select the wrong ATM.
+                spotLtpPaise = 0L,
+                selectedStrike = null,
+                selectedCallStrike = null,
+                selectedPutStrike = null
+            )
         }
-        _uiState.update { it.copy(selectedIndex = index, lotSize = lotSize) }
         refreshOptionChain()
     }
 
     fun refreshHealth() {
         viewModelScope.launch {
-            when (val result = repository.checkHealth()) {
+            when (val result = repository.getAuthStatus()) {
                 is ApiResult.Success -> {
-                    val h = result.data
+                    val s = result.data
                     _uiState.update {
                         it.copy(
-                            brokerMode = h.brokerMode.uppercase(),
-                            brokerConnected = h.brokerConnected,
-                            wsFeedHealthy = h.wsFeedHealthy,
-                            tradingEnabled = h.tradingEnabled,
-                            wsFeedStatus = h.wsFeedStatus,
-                            accountStateUncertain = h.accountStateUncertain,
+                            brokerMode = (s.brokerMode ?: "LIVE").uppercase(),
+                            brokerConnected = s.brokerConnected,
+                            wsFeedHealthy = s.wsFeedHealthy,
+                            tradingEnabled = s.tradingEnabled,
+                            wsFeedStatus = s.wsFeedStatus,
                             userId = repository.configStore.getDeviceId()
                         )
                     }
+                    if (!s.brokerConnected && !_uiState.value.dailyOtpSheet.isVisible) {
+                        openDailyOtpSheet()
+                    }
                 }
                 is ApiResult.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            brokerConnected = false,
-                            wsFeedHealthy = false,
-                            tradingEnabled = false,
-                            wsFeedStatus = "OFFLINE"
-                        )
+                    // Fallback to checkHealth() for backwards compatibility with health probe
+                    when (val healthResult = repository.checkHealth()) {
+                        is ApiResult.Success -> {
+                            val h = healthResult.data
+                            _uiState.update {
+                                it.copy(
+                                    brokerMode = h.brokerMode.uppercase(),
+                                    brokerConnected = h.brokerConnected,
+                                    wsFeedHealthy = h.wsFeedHealthy,
+                                    tradingEnabled = h.tradingEnabled,
+                                    wsFeedStatus = h.wsFeedStatus,
+                                    accountStateUncertain = h.accountStateUncertain,
+                                    userId = repository.configStore.getDeviceId()
+                                )
+                            }
+                            if (!h.brokerConnected && !_uiState.value.dailyOtpSheet.isVisible) {
+                                openDailyOtpSheet()
+                            }
+                        }
+                        is ApiResult.Error -> {
+                            _uiState.update {
+                                it.copy(
+                                    brokerConnected = false,
+                                    wsFeedHealthy = false,
+                                    tradingEnabled = false,
+                                    wsFeedStatus = "OFFLINE"
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -730,10 +759,17 @@ class ScalperViewModel(
                             peLtpPaise = s.peLtpPaise
                         )
                     }.toPersistentList()
-                    val defaultStrike = _uiState.value.selectedStrike ?: strikesList.getOrNull(strikesList.size / 2)?.strikePrice
-                    val callStrike = _uiState.value.selectedCallStrike ?: defaultStrike
-                    val putStrike = _uiState.value.selectedPutStrike ?: defaultStrike
-                    val spotPaise = defaultStrike?.let { (it * 100).toLong() } ?: 2452080L
+
+                    // Automatically calculate ATM strike based on current spot LTP
+                    val currentSpotPaise = _uiState.value.spotLtpPaise
+                    val spotPrice = currentSpotPaise / 100.0
+                    val atmStrike = if (strikesList.isNotEmpty() && currentSpotPaise > 0L) {
+                        strikesList.minByOrNull { kotlin.math.abs(it.strikePrice - spotPrice) }?.strikePrice
+                    } else null
+
+                    val defaultStrike = _uiState.value.selectedStrike ?: atmStrike
+                    val callStrike = _uiState.value.selectedCallStrike ?: atmStrike ?: defaultStrike
+                    val putStrike = _uiState.value.selectedPutStrike ?: atmStrike ?: defaultStrike
 
                     _uiState.update {
                         it.copy(
@@ -741,8 +777,7 @@ class ScalperViewModel(
                             strikes = strikesList,
                             selectedStrike = defaultStrike,
                             selectedCallStrike = callStrike,
-                            selectedPutStrike = putStrike,
-                            spotLtpPaise = spotPaise
+                            selectedPutStrike = putStrike
                         )
                     }
                 }

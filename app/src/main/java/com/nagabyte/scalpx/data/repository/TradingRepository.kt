@@ -177,6 +177,10 @@ open class TradingRepository(
         }
     }
 
+    open suspend fun getAuthStatus(): ApiResult<AuthStatusResponse> = safeApiCall {
+        api.getAuthStatus()
+    }
+
     open suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int = 10): ApiResult<OptionChainResponse> = safeApiCall {
         api.getOptionChain(symbol, expiry, strikes)
     }

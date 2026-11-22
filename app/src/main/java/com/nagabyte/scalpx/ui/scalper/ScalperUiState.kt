@@ -116,7 +116,7 @@ data class ScalperUiState(
     val snapshotAgeMs: Long = 0L,
     val userId: String = "",
 
-    val selectedIndex: String = "NIFTY",
+    val selectedIndex: String = "SENSEX",
     val selectedExpiry: String = "",
     val strikes: ImmutableList<OptionStrikeUi> = persistentListOf(),
     val availableExpiries: ImmutableList<String> = persistentListOf(),
@@ -124,13 +124,14 @@ data class ScalperUiState(
     val selectedCallStrike: Double? = null,
     val selectedPutStrike: Double? = null,
 
-    val selectedLots: Int = 2,
-    val lotSize: Int = 25,
+    val selectedLots: Int = 1,
+    // Zero means the backend has not supplied validated contract metadata yet.
+    val lotSize: Int = 0,
     val product: String = "MIS",
 
-    val spotLtpPaise: Long = 2452080L,
-    val spotChangePts: Double = -97.15,
-    val spotChangePercent: Double = -0.23,
+    val spotLtpPaise: Long = 0L,
+    val spotChangePts: Double = 120.50,
+    val spotChangePercent: Double = 0.15,
 
     val oneClickEnabled: Boolean = true,
     val isZone2Collapsed: Boolean = false,

@@ -28,6 +28,9 @@ interface TradingApi {
     @POST("api/auth/daily-login")
     suspend fun dailyLogin(@Body request: DailyLoginRequest): Response<DailyLoginResponse>
 
+    @GET("/api/auth/status")
+    suspend fun getAuthStatus(): AuthStatusResponse
+
     @GET("/api/option-chain")
     suspend fun getOptionChain(
         @Query("symbol") symbol: String,

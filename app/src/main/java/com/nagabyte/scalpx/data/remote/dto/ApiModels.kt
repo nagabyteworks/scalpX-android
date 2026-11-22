@@ -53,6 +53,17 @@ data class DailyLoginResponse(
 )
 
 @Serializable
+data class AuthStatusResponse(
+    val status: String = "AUTHENTICATION_REQUIRED",
+    val brokerConnected: Boolean = false,
+    val wsFeedHealthy: Boolean = false,
+    val wsFeedStatus: String = "FEED_DISCONNECTED",
+    val tradeDate: String? = null,
+    val brokerMode: String? = null,
+    val tradingEnabled: Boolean = false
+)
+
+@Serializable
 data class ApiErrorResponse(
     val error: String = "",
     val message: String = "",
