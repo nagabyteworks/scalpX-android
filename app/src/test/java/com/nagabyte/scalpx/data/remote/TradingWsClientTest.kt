@@ -134,6 +134,50 @@ class TradingWsClientTest {
         assertNotNull(event.data)
     }
 
+    @Test
+    fun `wsClient connects using headers only without query parameters`() = runBlocking {
+        mockWebServer.enqueue(
+            MockResponse()
+                .withWebSocketUpgrade(object : WebSocketListener() {})
+        )
+
+        wsClient.connect()
+
+        val recordedRequest = mockWebServer.takeRequest()
+        assertEquals("/ws", recordedRequest.path)
+        assertEquals("Bearer test-ws-token", recordedRequest.getHeader("Authorization"))
+        assertEquals("test-ws-device-id", recordedRequest.getHeader("X-Device-Id"))
+    }
+
+    @Test
+    fun `wsClient safely handles unknown event types without crashing`() = runBlocking {
+        var serverWs: WebSocket? = null
+        mockWebServer.enqueue(
+            MockResponse()
+                .withWebSocketUpgrade(object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        serverWs = webSocket
+                        // Push an unknown event type
+                        webSocket.send("""
+                            {
+                                "type": "CUSTOM_UNKNOWN_BROKER_EVENT",
+                                "timestamp": 1732174200500,
+                                "data": { "foo": "bar" }
+                            }
+                        """.trimIndent())
+                    }
+                })
+        )
+
+        wsClient.connect()
+
+        val event = withTimeout(5000) {
+            wsClient.priorityEventFlow.first()
+        }
+
+        assertEquals("CUSTOM_UNKNOWN_BROKER_EVENT", event.type)
+    }
+
     private class FakeConfigStore(
         private var baseUrl: String,
         private var jwtToken: String?,

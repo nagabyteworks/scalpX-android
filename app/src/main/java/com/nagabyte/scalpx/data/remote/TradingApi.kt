@@ -14,6 +14,11 @@ import java.util.concurrent.TimeUnit
 
 interface TradingApi {
 
+    @POST("/api/auth/provision-device")
+    suspend fun provisionDevice(
+        @Body request: ProvisionDeviceRequest
+    ): Response<ProvisionDeviceResponse>
+
     @GET("/health")
     suspend fun getHealth(): HealthDto
 

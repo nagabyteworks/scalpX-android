@@ -143,13 +143,6 @@ class MainActivity : FragmentActivity() {
                         Toast.makeText(this@MainActivity, effect.message, Toast.LENGTH_SHORT).show()
                     }
                     is ScalperUiEffect.OpenCustomTab -> {
-                        val pwd = app.configStore.getFlattradePassword()
-                        if (!pwd.isNullOrBlank()) {
-                            val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                            val clip = android.content.ClipData.newPlainText("Flattrade Password", pwd)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(this@MainActivity, "Password copied to clipboard for easy paste!", Toast.LENGTH_SHORT).show()
-                        }
                         BrokerLoginHelper.openCustomTab(this@MainActivity, effect.url)
                     }
                     is ScalperUiEffect.PlaySound -> {

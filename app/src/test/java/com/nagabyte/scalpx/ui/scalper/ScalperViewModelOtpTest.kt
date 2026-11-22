@@ -240,6 +240,7 @@ class ScalperViewModelOtpTest {
             }
 
             private fun createDummyApi(): TradingApi = object : TradingApi {
+                override suspend fun provisionDevice(request: ProvisionDeviceRequest) = throw NotImplementedError()
                 override suspend fun getHealth() = throw NotImplementedError()
                 override suspend fun getLoginUrl() = throw NotImplementedError()
                 override suspend fun dailyLogin(request: DailyLoginRequest) = throw NotImplementedError()

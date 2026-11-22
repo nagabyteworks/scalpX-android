@@ -12,7 +12,25 @@ data class HealthDto(
     val wsFeedHealthy: Boolean,
     val openPositionsCount: Int,
     val memoryRssMb: Long,
-    val uptimeSec: Long
+    val uptimeSec: Long,
+    val tradingEnabled: Boolean = false,
+    val wsFeedStatus: String = "UNKNOWN",
+    val accountStateUncertain: Boolean = false,
+    val timestamp: String? = null
+)
+
+@Serializable
+data class ProvisionDeviceRequest(
+    val enrollmentSecret: String,
+    val deviceName: String = "Android Device"
+)
+
+@Serializable
+data class ProvisionDeviceResponse(
+    val status: String = "ok",
+    val token: String,
+    val deviceId: String,
+    val expiresAt: Long
 )
 
 @Serializable

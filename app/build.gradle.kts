@@ -36,11 +36,7 @@ android {
         manifestPlaceholders["authDeepLinkScheme"] = "scalper"
         manifestPlaceholders["authDeepLinkHost"] = "auth"
 
-        buildConfigField("String", "ENV_BASE_URL", "\"${getEnv("SCALPX_BASE_URL", "http://localhost:3000")}\"")
-        buildConfigField("String", "ENV_JWT_TOKEN", "\"${getEnv("SCALPX_JWT_TOKEN", "")}\"")
-        buildConfigField("String", "ENV_FLATTRADE_USER_ID", "\"${getEnv("FLATTRADE_USER_ID", "")}\"")
-        buildConfigField("String", "ENV_FLATTRADE_PASSWORD", "\"${getEnv("FLATTRADE_PASSWORD", "")}\"")
-        buildConfigField("String", "ENV_FLATTRADE_ACCESS_TOKEN", "\"${getEnv("FLATTRADE_ACCESS_TOKEN", "")}\"")
+        buildConfigField("String", "ENV_BASE_URL", "\"${getEnv("SCALPX_BASE_URL", "https://trade.nagabyte.com")}\"")
     }
 
     buildTypes {
