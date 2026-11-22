@@ -46,8 +46,9 @@ class TradingWsClient(
     private val _connectionState = MutableStateFlow<WsConnectionState>(WsConnectionState.Disconnected)
     val connectionState: StateFlow<WsConnectionState> = _connectionState
 
-    private val _pingMs = MutableStateFlow(0L)
-    val pingMs: StateFlow<Long> = _pingMs
+    private val _snapshotAgeMs = MutableStateFlow(0L)
+    val snapshotAgeMs: StateFlow<Long> = _snapshotAgeMs
+    val pingMs: StateFlow<Long> = _snapshotAgeMs
 
     private var reconnectJob: Job? = null
     private var isExplicitDisconnect = false
@@ -63,7 +64,8 @@ class TradingWsClient(
         val token = configStore.getJwtToken() ?: ""
         val deviceId = configStore.getDeviceId()
 
-        val wsUrl = "$baseUrl/ws?token=$token&deviceId=$deviceId"
+        // Strict header-based auth without query parameters
+        val wsUrl = "$baseUrl/ws"
         val request = Request.Builder()
             .url(wsUrl)
             .header("X-Device-Id", deviceId)
@@ -83,7 +85,7 @@ class TradingWsClient(
         webSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 backoffDelayMs = INITIAL_BACKOFF_MS
-                _connectionState.value = WsConnectionState.Connected(_pingMs.value)
+                _connectionState.value = WsConnectionState.Connected(_snapshotAgeMs.value)
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -93,14 +95,18 @@ class TradingWsClient(
                             val snapshot = json.decodeFromString<TradingSnapshotMessage>(text)
                             val now = System.currentTimeMillis()
                             if (snapshot.timestamp > 0) {
-                                val latency = (now - snapshot.timestamp).coerceAtLeast(0L)
-                                _pingMs.value = latency
-                                _connectionState.value = WsConnectionState.Connected(latency)
+                                val age = (now - snapshot.timestamp).coerceAtLeast(0L)
+                                _snapshotAgeMs.value = age
+                                _connectionState.value = WsConnectionState.Connected(age)
                             }
                             _snapshotFlow.emit(snapshot)
                         } else {
-                            val event = json.decodeFromString<PriorityEventMessage>(text)
-                            _priorityEventFlow.emit(event)
+                            try {
+                                val event = json.decodeFromString<PriorityEventMessage>(text)
+                                _priorityEventFlow.emit(event)
+                            } catch (_: Exception) {
+                                // Unknown event type; ignore gracefully to avoid crashing
+                            }
                         }
                     } catch (_: Exception) {
                         // Skip malformed frames

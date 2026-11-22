@@ -231,6 +231,75 @@ class TradingApiTest {
         assertEquals("test-device-uuid-1234", recorded.getHeader("X-Device-Id"))
     }
 
+    @Test
+    fun `provisionDevice sends enrollmentSecret and receives device-bound JWT`() = runBlocking {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                    {
+                        "status": "ok",
+                        "token": "device-bound-jwt-9999",
+                        "deviceId": "test-device-uuid-1234",
+                        "expiresAt": 1735000000000
+                    }
+                """.trimIndent())
+        )
+
+        val response = tradingApi.provisionDevice(
+            ProvisionDeviceRequest(
+                enrollmentSecret = "owner-enrollment-secret-xyz",
+                deviceName = "Android Trading Phone"
+            )
+        )
+
+        assertTrue(response.isSuccessful)
+        val body = response.body()
+        assertNotNull(body)
+        assertEquals("ok", body?.status)
+        assertEquals("device-bound-jwt-9999", body?.token)
+        assertEquals("test-device-uuid-1234", body?.deviceId)
+        assertEquals(1735000000000L, body?.expiresAt)
+
+        val recorded = mockWebServer.takeRequest()
+        assertEquals("/api/auth/provision-device", recorded.path)
+        assertEquals("POST", recorded.method)
+        val bodyStr = recorded.body.readUtf8()
+        assertTrue(bodyStr.contains("\"enrollmentSecret\":\"owner-enrollment-secret-xyz\""))
+        assertTrue(bodyStr.contains("\"deviceName\":\"Android Trading Phone\""))
+    }
+
+    @Test
+    fun `HealthDto parses tradingEnabled, wsFeedStatus and accountStateUncertain`() = runBlocking {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("""
+                    {
+                        "status": "ok",
+                        "brokerMode": "paper",
+                        "brokerConnected": true,
+                        "wsFeedHealthy": true,
+                        "tradingEnabled": false,
+                        "wsFeedStatus": "FEED_CONNECTED",
+                        "accountStateUncertain": false,
+                        "openPositionsCount": 0,
+                        "memoryRssMb": 55,
+                        "uptimeSec": 450
+                    }
+                """.trimIndent())
+        )
+
+        val health = tradingApi.getHealth()
+        assertEquals("ok", health.status)
+        assertEquals("paper", health.brokerMode)
+        assertFalse(health.tradingEnabled)
+        assertEquals("FEED_CONNECTED", health.wsFeedStatus)
+        assertFalse(health.accountStateUncertain)
+    }
+
     private class FakeConfigStore(
         private var baseUrl: String,
         private var jwtToken: String?,

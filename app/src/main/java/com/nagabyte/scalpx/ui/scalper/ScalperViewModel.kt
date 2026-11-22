@@ -101,8 +101,8 @@ class ScalperViewModel(
         }
 
         viewModelScope.launch {
-            repository.pingMs.collect { ping ->
-                _uiState.update { it.copy(pingMs = ping) }
+            repository.snapshotAgeMs.collect { age ->
+                _uiState.update { it.copy(snapshotAgeMs = age, pingMs = age) }
             }
         }
 
@@ -221,6 +221,36 @@ class ScalperViewModel(
     private fun handleOneClickBuy(intent: ScalperIntent.OneClickBuy) {
         val actionKey = "BUY_${intent.token}"
         if (!acquireActionLock(actionKey)) return
+
+        // Safety gating for new order entries
+        if (!_uiState.value.brokerConnected) {
+            viewModelScope.launch {
+                _uiEffect.emit(ScalperUiEffect.ShowToast("Order blocked: Broker is disconnected"))
+            }
+            releaseActionLock(actionKey)
+            return
+        }
+        if (!_uiState.value.tradingEnabled) {
+            viewModelScope.launch {
+                _uiEffect.emit(ScalperUiEffect.ShowToast("Order entry blocked: TRADING_ENABLED=false"))
+            }
+            releaseActionLock(actionKey)
+            return
+        }
+        if (_uiState.value.accountStateUncertain) {
+            viewModelScope.launch {
+                _uiEffect.emit(ScalperUiEffect.ShowToast("Order blocked: Broker account state is uncertain"))
+            }
+            releaseActionLock(actionKey)
+            return
+        }
+        if (_uiState.value.wsFeedStatus == "FEED_STALE") {
+            viewModelScope.launch {
+                _uiEffect.emit(ScalperUiEffect.ShowToast("Order blocked: Market feed is stale"))
+            }
+            releaseActionLock(actionKey)
+            return
+        }
 
         viewModelScope.launch {
             try {
@@ -658,6 +688,9 @@ class ScalperViewModel(
                             brokerMode = h.brokerMode.uppercase(),
                             brokerConnected = h.brokerConnected,
                             wsFeedHealthy = h.wsFeedHealthy,
+                            tradingEnabled = h.tradingEnabled,
+                            wsFeedStatus = h.wsFeedStatus,
+                            accountStateUncertain = h.accountStateUncertain,
                             userId = repository.configStore.getDeviceId()
                         )
                     }
@@ -666,7 +699,9 @@ class ScalperViewModel(
                     _uiState.update {
                         it.copy(
                             brokerConnected = false,
-                            wsFeedHealthy = false
+                            wsFeedHealthy = false,
+                            tradingEnabled = false,
+                            wsFeedStatus = "OFFLINE"
                         )
                     }
                 }

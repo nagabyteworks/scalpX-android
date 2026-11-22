@@ -51,6 +51,7 @@ open class TradingRepository(
 
     open val connectionState: StateFlow<WsConnectionState> = wsClient.connectionState
     open val pingMs: StateFlow<Long> = wsClient.pingMs
+    open val snapshotAgeMs: StateFlow<Long> = wsClient.snapshotAgeMs
 
     init {
         scope.launch {
@@ -73,6 +74,49 @@ open class TradingRepository(
 
     fun isUserAuthenticated(): Boolean = !configStore.getJwtToken().isNullOrBlank()
     fun saveJwtToken(token: String?) = configStore.setJwtToken(token)
+
+    open fun clearAuth() {
+        configStore.clearAuth()
+        disconnectWebSocket()
+    }
+
+    open suspend fun provisionDevice(
+        enrollmentSecret: String,
+        deviceName: String = "Android Device"
+    ): ApiResult<ProvisionDeviceResponse> {
+        return try {
+            val response = api.provisionDevice(
+                ProvisionDeviceRequest(
+                    enrollmentSecret = enrollmentSecret.trim(),
+                    deviceName = deviceName.trim()
+                )
+            )
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) {
+                    configStore.setJwtToken(body.token)
+                    ApiResult.Success(body)
+                } else {
+                    ApiResult.Error("Empty response body from device provisioning", response.code())
+                }
+            } else {
+                val code = response.code()
+                val errorBody = response.errorBody()?.string() ?: ""
+                val msg = when (code) {
+                    401 -> "Invalid device enrollment secret"
+                    403 -> "Device not authorized or enrollment rejected"
+                    429 -> "Provisioning rate limited. Please wait."
+                    else -> "Device provisioning failed ($code): $errorBody"
+                }
+                ApiResult.Error(message = msg, statusCode = code)
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(
+                message = e.localizedMessage ?: "Network error during device provisioning",
+                cause = e
+            )
+        }
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
 

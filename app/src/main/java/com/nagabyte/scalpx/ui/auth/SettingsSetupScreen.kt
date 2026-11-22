@@ -1,5 +1,9 @@
 package com.nagabyte.scalpx.ui.auth
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,22 +41,25 @@ fun SettingsSetupScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
     var baseUrl by remember { mutableStateOf(configStore.getServerBaseUrl()) }
     var jwtToken by remember { mutableStateOf(configStore.getJwtToken() ?: "") }
     var isTokenVisible by remember { mutableStateOf(false) }
 
-    var flattradeUserId by remember { mutableStateOf(configStore.getFlattradeUserId() ?: "") }
-    var flattradePassword by remember { mutableStateOf(configStore.getFlattradePassword() ?: "") }
-    var isPasswordVisible by remember { mutableStateOf(false) }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var enrollmentSecret by remember { mutableStateOf("") }
+    var isSecretVisible by remember { mutableStateOf(false) }
+    var isProvisioning by remember { mutableStateOf(false) }
 
     var isTestingConnection by remember { mutableStateOf(false) }
     var healthResult by remember { mutableStateOf<HealthDto?>(null) }
     var healthError by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
+    val deviceId = remember { configStore.getDeviceId() }
+    val isEnrolled = !configStore.getJwtToken().isNullOrBlank()
 
     Column(
         modifier = modifier
@@ -77,7 +85,7 @@ fun SettingsSetupScreen(
             modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
         )
 
-        // Server Base URL Card
+        // Server Connection & Device Identity Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -96,7 +104,7 @@ fun SettingsSetupScreen(
                     onValueChange = { baseUrl = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("https://trade.domain.com or http://10.0.2.2:3000", color = Color.Gray, fontSize = 12.sp) },
+                    placeholder = { Text("https://trade.nagabyte.com", color = Color.Gray, fontSize = 12.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
@@ -108,53 +116,48 @@ fun SettingsSetupScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "Personal JWT Token",
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    fontSize = 14.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = jwtToken,
-                    onValueChange = { jwtToken = it },
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("HS256 Bearer Token", color = Color.Gray) },
-                    visualTransformation = if (isTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    trailingIcon = {
-                        TextButton(onClick = { isTokenVisible = !isTokenVisible }) {
-                            Text(
-                                text = if (isTokenVisible) "HIDE" else "SHOW",
-                                fontSize = 11.sp,
-                                color = Color(0xFF4C6EF5)
-                            )
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.LightGray,
-                        focusedBorderColor = Color(0xFF4C6EF5),
-                        unfocusedBorderColor = Color(0xFF2C3242)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Device Identification",
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White,
+                        fontSize = 14.sp
                     )
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
+                    TextButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("Device ID", deviceId)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Device ID copied to clipboard", Toast.LENGTH_SHORT).show()
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text("COPY", color = Color(0xFF4C6EF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Device ID: ${configStore.getDeviceId()}",
-                    fontSize = 11.sp,
+                    text = deviceId,
+                    fontSize = 12.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = Color(0xFF6B7280)
+                    color = Color(0xFF00E676)
+                )
+                Text(
+                    text = "Permanent UUID bound to backend authorization claims.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF8E95A5),
+                    modifier = Modifier.padding(top = 2.dp)
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Flattrade Broker Credentials Card
+        // Device Provisioning Card (Secret Enrollment)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -167,77 +170,45 @@ fun SettingsSetupScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Flattrade Broker Password",
+                        text = "Device Enrollment & Provisioning",
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                         fontSize = 14.sp
                     )
-                    if (flattradePassword.isNotBlank()) {
-                        TextButton(
-                            onClick = {
-                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                val clip = android.content.ClipData.newPlainText("Flattrade Password", flattradePassword)
-                                clipboard.setPrimaryClip(clip)
-                                android.widget.Toast.makeText(context, "Password copied to clipboard!", android.widget.Toast.LENGTH_SHORT).show()
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
-                            Text("COPY", color = Color(0xFF4C6EF5), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
+                    Surface(
+                        color = if (isEnrolled) Color(0xFF00E676).copy(alpha = 0.15f) else Color(0xFFFFB300).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = if (isEnrolled) "AUTHORIZED" else "NOT ENROLLED",
+                            color = if (isEnrolled) Color(0xFF00E676) else Color(0xFFFFB300),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Saved securely in Android Keystore. Auto-copied to clipboard when launching OAuth.",
+                    text = "Enter the high-entropy enrollment secret configured on the backend server (/etc/scalpx/env).",
                     fontSize = 11.sp,
                     color = Color(0xFF8E95A5)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    text = "User ID",
-                    fontWeight = FontWeight.Medium,
-                    color = Color.LightGray,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
-                    value = flattradeUserId,
-                    onValueChange = { flattradeUserId = it },
+                    value = enrollmentSecret,
+                    onValueChange = { enrollmentSecret = it },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("e.g. FT012345", color = Color.Gray, fontSize = 12.sp) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.LightGray,
-                        focusedBorderColor = Color(0xFF4C6EF5),
-                        unfocusedBorderColor = Color(0xFF2C3242)
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "Password",
-                    fontWeight = FontWeight.Medium,
-                    color = Color.LightGray,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                OutlinedTextField(
-                    value = flattradePassword,
-                    onValueChange = { flattradePassword = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("Enter your Flattrade password", color = Color.Gray, fontSize = 12.sp) },
-                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    placeholder = { Text("Enter DEVICE_ENROLLMENT_SECRET", color = Color.Gray, fontSize = 12.sp) },
+                    visualTransformation = if (isSecretVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        TextButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                        TextButton(onClick = { isSecretVisible = !isSecretVisible }) {
                             Text(
-                                text = if (isPasswordVisible) "HIDE" else "SHOW",
+                                text = if (isSecretVisible) "HIDE" else "SHOW",
                                 fontSize = 11.sp,
                                 color = Color(0xFF4C6EF5)
                             )
@@ -252,6 +223,66 @@ fun SettingsSetupScreen(
                         unfocusedBorderColor = Color(0xFF2C3242)
                     )
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            coroutineScope.launch {
+                                isProvisioning = true
+                                statusMessage = null
+                                errorMessage = null
+                                configStore.setServerBaseUrl(baseUrl.trim())
+
+                                when (val result = repository.provisionDevice(enrollmentSecret.trim())) {
+                                    is ApiResult.Success -> {
+                                        jwtToken = result.data.token
+                                        enrollmentSecret = ""
+                                        statusMessage = "Device successfully provisioned and bound!"
+                                        Toast.makeText(context, "Provisioning Successful!", Toast.LENGTH_SHORT).show()
+                                        onSaved()
+                                    }
+                                    is ApiResult.Error -> {
+                                        errorMessage = result.message
+                                    }
+                                }
+                                isProvisioning = false
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(44.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4C6EF5)),
+                        enabled = !isProvisioning && enrollmentSecret.isNotBlank() && baseUrl.isNotBlank()
+                    ) {
+                        if (isProvisioning) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                            Text("Provision Device", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    if (isEnrolled) {
+                        OutlinedButton(
+                            onClick = {
+                                focusManager.clearFocus()
+                                repository.clearAuth()
+                                jwtToken = ""
+                                statusMessage = "Device authorization cleared."
+                                Toast.makeText(context, "Signed out", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.height(44.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252))
+                        ) {
+                            Text("Sign Out", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
 
@@ -276,7 +307,7 @@ fun SettingsSetupScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = "CONNECTION VERIFIED",
+                                text = "BACKEND HEALTHY",
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF00E676),
                                 fontSize = 14.sp
@@ -303,10 +334,24 @@ fun SettingsSetupScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "WS Feed Healthy: ${if (hr.wsFeedHealthy) "YES" else "NO"}",
+                            text = "Trading Enabled: ${if (hr.tradingEnabled) "YES (LIVE READY)" else "NO (FAIL-CLOSED)"}",
+                            color = if (hr.tradingEnabled) Color(0xFF00E676) else Color(0xFFFFB300),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "WS Market Feed: ${hr.wsFeedStatus}",
                             color = if (hr.wsFeedHealthy) Color(0xFF00E676) else Color(0xFFFF5252),
                             fontSize = 12.sp
                         )
+                        if (hr.accountStateUncertain) {
+                            Text(
+                                text = "ACCOUNT STATE UNCERTAIN: Order placement blocked",
+                                color = Color(0xFFFF5252),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         Text(
                             text = "Server Memory RSS: ${hr.memoryRssMb} MB | Uptime: ${hr.uptimeSec}s",
                             color = Color(0xFF8E95A5),
@@ -344,7 +389,6 @@ fun SettingsSetupScreen(
                         healthResult = null
                         healthError = null
                         configStore.setServerBaseUrl(baseUrl.trim())
-                        configStore.setJwtToken(jwtToken.trim())
 
                         when (val result = repository.checkHealth()) {
                             is ApiResult.Success -> {
@@ -366,7 +410,7 @@ fun SettingsSetupScreen(
                 if (isTestingConnection) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                 } else {
-                    Text("Test Connection", color = Color(0xFF4C6EF5), fontWeight = FontWeight.SemiBold)
+                    Text("Test Health", color = Color(0xFF4C6EF5), fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -374,9 +418,9 @@ fun SettingsSetupScreen(
                 onClick = {
                     focusManager.clearFocus()
                     configStore.setServerBaseUrl(baseUrl.trim())
-                    configStore.setJwtToken(jwtToken.trim())
-                    configStore.setFlattradeUserId(flattradeUserId.trim().ifEmpty { null })
-                    configStore.setFlattradePassword(flattradePassword.ifEmpty { null })
+                    if (jwtToken.isNotBlank()) {
+                        configStore.setJwtToken(jwtToken.trim())
+                    }
                     statusMessage = "Configuration Saved!"
                     onSaved()
                 },
@@ -387,13 +431,17 @@ fun SettingsSetupScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4C6EF5)),
                 enabled = baseUrl.isNotBlank()
             ) {
-                Text("Save & Apply", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Save & Close", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 
         if (statusMessage != null) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(text = statusMessage!!, color = Color(0xFF00E676), fontSize = 12.sp)
+        }
+        if (errorMessage != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = errorMessage!!, color = Color(0xFFFF5252), fontSize = 12.sp)
         }
     }
 }

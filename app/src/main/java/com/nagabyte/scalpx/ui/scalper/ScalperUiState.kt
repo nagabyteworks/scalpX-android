@@ -109,7 +109,11 @@ data class ScalperUiState(
     val serverWsState: WsState = WsState.DISCONNECTED,
     val brokerConnected: Boolean = false,
     val wsFeedHealthy: Boolean = false,
+    val tradingEnabled: Boolean = false,
+    val wsFeedStatus: String = "UNKNOWN",
+    val accountStateUncertain: Boolean = false,
     val pingMs: Long = 0L,
+    val snapshotAgeMs: Long = 0L,
     val userId: String = "",
 
     val selectedIndex: String = "NIFTY",

@@ -18,13 +18,6 @@ class SecureStorage(context: Context) : ConfigStore {
     override fun getDeviceId(): String = delegate.getDeviceId()
     override fun clearAuth() = delegate.clearAuth()
 
-    override fun getFlattradePassword(): String? = delegate.getFlattradePassword()
-    override fun setFlattradePassword(password: String?) = delegate.setFlattradePassword(password)
-    override fun getFlattradeUserId(): String? = delegate.getFlattradeUserId()
-    override fun setFlattradeUserId(userId: String?) = delegate.setFlattradeUserId(userId)
-    override fun getFlattradeAccessToken(): String? = delegate.getFlattradeAccessToken()
-    override fun setFlattradeAccessToken(token: String?) = delegate.setFlattradeAccessToken(token)
-
     override fun getDefaultLots(): Int = delegate.getDefaultLots()
     override fun setDefaultLots(lots: Int) = delegate.setDefaultLots(lots)
     override fun getFirstTargetPts(): Double = delegate.getFirstTargetPts()

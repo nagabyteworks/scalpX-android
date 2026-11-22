@@ -255,6 +255,63 @@ class ScalperViewModelTest {
         assertEquals(11100L, fakeRepo.lastPatchedNextMilestonePaise)
     }
 
+    @Test
+    fun `OneClickBuy is blocked when trading is disabled`() = runTest(testDispatcher) {
+        fakeRepo.healthTradingEnabled = false
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        viewModel.handleIntent(
+            ScalperIntent.OneClickBuy(
+                token = "26000",
+                symbol = "NIFTY26NOV24500CE",
+                ltpPaise = 10000L,
+                lotSize = 25
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Order must NOT be dispatched when tradingEnabled=false", 0, fakeRepo.oneClickOrderCallCount.get())
+    }
+
+    @Test
+    fun `OneClickBuy is blocked when broker account state is uncertain`() = runTest(testDispatcher) {
+        fakeRepo.healthAccountStateUncertain = true
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        viewModel.handleIntent(
+            ScalperIntent.OneClickBuy(
+                token = "26000",
+                symbol = "NIFTY26NOV24500CE",
+                ltpPaise = 10000L,
+                lotSize = 25
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Order must NOT be dispatched when accountStateUncertain=true", 0, fakeRepo.oneClickOrderCallCount.get())
+    }
+
+    @Test
+    fun `OneClickBuy is blocked when broker is disconnected`() = runTest(testDispatcher) {
+        fakeRepo.healthBrokerConnected = false
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        viewModel.handleIntent(
+            ScalperIntent.OneClickBuy(
+                token = "26000",
+                symbol = "NIFTY26NOV24500CE",
+                ltpPaise = 10000L,
+                lotSize = 25
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("Order must NOT be dispatched when broker is disconnected", 0, fakeRepo.oneClickOrderCallCount.get())
+    }
+
     private class FakeTradingRepository : TradingRepository(
         api = createDummyApi(),
         wsClient = createDummyWsClient(),
@@ -264,6 +321,11 @@ class ScalperViewModelTest {
         var lastSubmittedFirstMilestonePaise: Long? = null
         var lastPatchedToken: String? = null
         var lastPatchedNextMilestonePaise: Long? = null
+
+        var healthTradingEnabled = true
+        var healthBrokerConnected = true
+        var healthAccountStateUncertain = false
+        var healthWsFeedStatus = "FEED_CONNECTED"
 
         private val testSnapshotFlow = MutableStateFlow<TradingSnapshotMessage?>(null)
         override val snapshotStream = testSnapshotFlow
@@ -290,8 +352,11 @@ class ScalperViewModelTest {
                 HealthDto(
                     status = "ok",
                     brokerMode = "paper",
-                    brokerConnected = true,
+                    brokerConnected = healthBrokerConnected,
                     wsFeedHealthy = true,
+                    tradingEnabled = healthTradingEnabled,
+                    wsFeedStatus = healthWsFeedStatus,
+                    accountStateUncertain = healthAccountStateUncertain,
                     openPositionsCount = 0,
                     memoryRssMb = 45L,
                     uptimeSec = 300L
@@ -406,6 +471,7 @@ class ScalperViewModelTest {
             }
 
             private fun createDummyApi(): TradingApi = object : TradingApi {
+                override suspend fun provisionDevice(request: ProvisionDeviceRequest) = throw NotImplementedError()
                 override suspend fun getHealth() = throw NotImplementedError()
                 override suspend fun getLoginUrl() = throw NotImplementedError()
                 override suspend fun dailyLogin(request: DailyLoginRequest) = throw NotImplementedError()
