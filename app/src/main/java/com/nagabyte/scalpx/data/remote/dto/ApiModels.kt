@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 data class HealthDto(
     val status: String,
-    val brokerMode: String,
+    val environment: String = "LIVE",
     val brokerConnected: Boolean,
     val wsFeedHealthy: Boolean,
     val openPositionsCount: Int,
@@ -23,36 +23,51 @@ data class HealthDto(
 )
 
 @Serializable
-data class ProvisionDeviceRequest(
-    val enrollmentSecret: String,
+data class AppConfigDto(
+    val environment: String = "LIVE",
+    val trading: TradingConfigDto = TradingConfigDto(),
+    val broker: BrokerConfigDto = BrokerConfigDto(),
+    val marketFeed: MarketFeedConfigDto = MarketFeedConfigDto(),
+    val device: DeviceStatusDto = DeviceStatusDto(),
+    val features: FeatureConfigDto = FeatureConfigDto()
+)
+
+@Serializable
+data class TradingConfigDto(val mode: String = "LIVE", val enabled: Boolean = false, val authorized: Boolean = false)
+@Serializable
+data class BrokerConfigDto(val connected: Boolean = false, val sessionValidity: String = "UNKNOWN")
+@Serializable
+data class MarketFeedConfigDto(val connected: Boolean = false, val status: String = "DISCONNECTED")
+@Serializable
+data class DeviceStatusDto(val id: String = "", val status: String = "UNKNOWN")
+@Serializable
+data class FeatureConfigDto(val optionsTrading: Boolean = false, val positions: Boolean = false, val orderManagement: Boolean = false)
+
+@Serializable
+data class DeviceAuthenticationRequest(
+    val deviceId: String,
+    val totp: String,
     val deviceName: String = "Android Device"
 )
 
 @Serializable
-data class ProvisionDeviceResponse(
+data class DeviceAuthenticationResponse(
     val status: String = "ok",
-    val token: String,
-    val deviceId: String,
-    val expiresAt: Long
+    val accessToken: String,
+    val expiresIn: Int = 900,
+    val device: AuthenticatedDeviceDto
+)
+
+@Serializable
+data class AuthenticatedDeviceDto(
+    val id: String,
+    val name: String,
+    val status: String
 )
 
 @Serializable
 data class LoginUrlResponse(
     val loginUrl: String
-)
-
-@Serializable
-data class DailyLoginRequest(
-    val otp: String
-)
-
-@Serializable
-data class DailyLoginResponse(
-    val brokerConnected: Boolean = true,
-    val tradeDate: String = "",
-    val tokenGeneratedAt: String = "",
-    val status: String? = null,
-    val message: String? = null
 )
 
 @Serializable
@@ -62,7 +77,7 @@ data class AuthStatusResponse(
     val wsFeedHealthy: Boolean = false,
     val wsFeedStatus: String = "FEED_DISCONNECTED",
     val tradeDate: String? = null,
-    val brokerMode: String? = null,
+    val environment: String? = null,
     val tradingEnabled: Boolean = false,
     val sessionTokenPresent: Boolean = false,
     val sessionValid: Boolean = false,
@@ -71,6 +86,19 @@ data class AuthStatusResponse(
     val wsAuthenticated: Boolean = false,
     val marketDataReady: Boolean = false,
     val accountStateUncertain: Boolean = false
+)
+
+@Serializable
+data class SensexSpotDto(
+    val index: String = "SENSEX",
+    val exchange: String = "BSE",
+    val token: String? = null,
+    val status: String = "WAITING_FOR_TICK",
+    val spotLtpPaise: Long? = null,
+    val timestamp: Long? = null,
+    val ageMs: Long? = null,
+    val marketDataReady: Boolean = false,
+    val validation: String? = null
 )
 
 @Serializable
@@ -99,7 +127,8 @@ data class OptionChainResponse(
     val strikes: List<OptionStrikeDto> = emptyList(),
     val atmStrike: Double? = null,
     val dataSource: String? = null,
-    val simulated: Boolean = false
+    val marketDataReady: Boolean = false,
+    val validation: String? = null
 )
 
 @Serializable

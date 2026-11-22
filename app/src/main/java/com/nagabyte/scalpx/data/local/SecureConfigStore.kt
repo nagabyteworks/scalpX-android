@@ -10,7 +10,7 @@ import java.util.UUID
 /**
  * Android Keystore-backed Secure Encrypted Storage.
  * Invariant: Flattrade api_secret never touches the device.
- * Stores only backend Base URL, personal JWT, permanent X-Device-Id, and execution presets.
+ * Stores only the personal JWT, permanent X-Device-Id, and execution presets.
  */
 class SecureConfigStore(context: Context) : ConfigStore {
 
@@ -37,17 +37,11 @@ class SecureConfigStore(context: Context) : ConfigStore {
     }
 
     override fun getServerBaseUrl(): String {
-        val stored = prefs.getString(KEY_BASE_URL, null)
-        val candidate = if (!stored.isNullOrBlank()) stored else BuildConfig.ENV_BASE_URL.ifBlank { DEFAULT_BASE_URL }
-        return normalizeUrl(candidate)
+        return normalizeUrl(BuildConfig.ENV_BASE_URL.ifBlank { DEFAULT_BASE_URL })
     }
 
     override fun setServerBaseUrl(url: String) {
-        val normalized = normalizeUrl(url.trim())
-        if (!BuildConfig.DEBUG && !normalized.startsWith("https://", ignoreCase = true)) {
-            throw IllegalArgumentException("Production release builds require HTTPS: $normalized")
-        }
-        prefs.edit().putString(KEY_BASE_URL, normalized).apply()
+        throw UnsupportedOperationException("Backend URL is controlled by the Android build configuration.")
     }
 
     override fun getJwtToken(): String? {
@@ -115,6 +109,7 @@ class SecureConfigStore(context: Context) : ConfigStore {
 
     private fun normalizeUrl(url: String): String {
         var u = url.trim()
+        require(u.startsWith("https://", ignoreCase = true)) { "The scalpX backend URL must use HTTPS." }
         while (u.endsWith("/")) {
             u = u.substring(0, u.length - 1)
         }
@@ -123,7 +118,6 @@ class SecureConfigStore(context: Context) : ConfigStore {
 
     companion object {
         private const val PREFS_NAME = "scalpx_secure_config"
-        private const val KEY_BASE_URL = "base_url"
         private const val KEY_JWT_TOKEN = "jwt_token"
         private const val KEY_DEVICE_ID = "device_id"
 

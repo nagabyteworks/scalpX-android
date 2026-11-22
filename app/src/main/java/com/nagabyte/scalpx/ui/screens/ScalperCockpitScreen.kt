@@ -15,6 +15,7 @@ import com.nagabyte.scalpx.ui.theme.LocalScalperTheme
 import com.nagabyte.scalpx.ui.theme.ScalperTheme
 import com.nagabyte.scalpx.ui.theme.getScalperColors
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.delay
 
 /**
  * 1Cliq-style Options Scalping Cockpit for Android portrait screens (360dp - 430dp).
@@ -27,6 +28,20 @@ fun ScalperCockpitScreen(
     modifier: Modifier = Modifier
 ) {
     val currentTheme = getScalperColors(state.isDarkTheme)
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            onIntent(ScalperIntent.RefreshSensexSpot)
+            delay(2_000)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(15_000)
+            onIntent(ScalperIntent.RefreshHealth)
+        }
+    }
 
     CompositionLocalProvider(LocalScalperTheme provides currentTheme) {
         val colors = ScalperTheme.colors
@@ -90,12 +105,10 @@ fun ScalperCockpitScreen(
             topBar = {
                 // ZONE 1: Pinned Top Header Bar (~44dp)
                 Zone1BrokerHeader(
-                    brokerMode = state.brokerMode,
                     serverWsState = state.serverWsState,
                     brokerConnected = state.brokerConnected,
                     wsFeedHealthy = state.wsFeedHealthy,
                     pingMs = state.pingMs,
-                    userId = state.userId,
                     isDarkTheme = state.isDarkTheme,
                     onConnectOtp = { onIntent(ScalperIntent.OpenDailyOtpSheet) },
                     onToggleTheme = { onIntent(ScalperIntent.ToggleTheme(it)) },
@@ -249,13 +262,10 @@ fun ScalperCockpitScreen(
             )
         }
 
-        // 3. Daily Flattrade OTP Sheet
+        // 3. Flattrade browser authorization sheet
         if (state.dailyOtpSheet.isVisible) {
             DailyOtpSheet(
                 sheetState = state.dailyOtpSheet,
-                brokerMode = state.brokerMode,
-                onOtpDigitsChanged = { onIntent(ScalperIntent.UpdateOtpDigits(it)) },
-                onSubmit = { onIntent(ScalperIntent.SubmitDailyOtp) },
                 onFallbackBrowserClick = { onIntent(ScalperIntent.LaunchBrowserOAuthFallback) },
                 onDismiss = { onIntent(ScalperIntent.DismissDailyOtpSheet) }
             )
@@ -365,7 +375,6 @@ private fun sampleState(isDark: Boolean = false, isTable: Boolean = false): Scal
     )
 
     return ScalperUiState(
-        brokerMode = "LIVE",
         brokerConnected = true,
         wsFeedHealthy = true,
         pingMs = 24L,

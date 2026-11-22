@@ -322,7 +322,7 @@ private fun PositionsCardsView(
                                 Icon(
                                     imageVector = if (pos.ratchetPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                                     contentDescription = if (pos.ratchetPaused) "Resume" else "Pause",
-                                    tint = if (pos.ratchetPaused) colors.paperMode else colors.textSecondary,
+                                    tint = if (pos.ratchetPaused) colors.warningColor else colors.textSecondary,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -746,15 +746,15 @@ private fun TradeBookView(
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(3.dp))
-                                .background(if (trade.status == "EXITED" || trade.status == "CLOSED") colors.buyGreen.copy(alpha = 0.15f) else colors.paperMode.copy(alpha = 0.15f))
-                                .border(1.dp, if (trade.status == "EXITED" || trade.status == "CLOSED") colors.buyGreen else colors.paperMode, RoundedCornerShape(3.dp))
+                                .background(if (trade.status == "EXITED" || trade.status == "CLOSED") colors.buyGreen.copy(alpha = 0.15f) else colors.warningColor.copy(alpha = 0.15f))
+                                .border(1.dp, if (trade.status == "EXITED" || trade.status == "CLOSED") colors.buyGreen else colors.warningColor, RoundedCornerShape(3.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = trade.status,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (trade.status == "EXITED" || trade.status == "CLOSED") colors.buyGreen else colors.paperMode
+                                color = if (trade.status == "EXITED" || trade.status == "CLOSED") colors.buyGreen else colors.warningColor
                             )
                         }
                     }

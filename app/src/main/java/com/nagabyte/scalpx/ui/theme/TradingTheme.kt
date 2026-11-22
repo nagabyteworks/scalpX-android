@@ -26,7 +26,7 @@ data class ScalperThemeColors(
     val sellRed: Color,
     val profitGreenText: Color,
     val lossRedText: Color,
-    val paperMode: Color,
+    val warningColor: Color,
     val liveMode: Color,
     val exchangeSlBg: Color,
     val exchangeSlBorder: Color,
@@ -50,7 +50,7 @@ val LightScalperColors = ScalperThemeColors(
     sellRed = Color(0xFFF44336),
     profitGreenText = Color(0xFF1E8E3E),
     lossRedText = Color(0xFFD93025),
-    paperMode = Color(0xFFF59E0B),
+    warningColor = Color(0xFFF59E0B),
     liveMode = Color(0xFFDC2626),
     exchangeSlBg = Color(0xFFE3F2FD),
     exchangeSlBorder = Color(0xFF1976D2),
@@ -74,7 +74,7 @@ val DarkScalperColors = ScalperThemeColors(
     sellRed = Color(0xFFF44336),
     profitGreenText = Color(0xFF00C853),
     lossRedText = Color(0xFFFF3B30),
-    paperMode = Color(0xFFFFB300),
+    warningColor = Color(0xFFFFB300),
     liveMode = Color(0xFFFF1744),
     exchangeSlBg = Color(0xFF0D47A1),
     exchangeSlBorder = Color(0xFF1976D2),
@@ -111,7 +111,6 @@ object TradingColors {
     val PanicRed = Color(0xFFD50000)
 
     val WarningAmber = Color(0xFFFFB300)
-    val PaperMode = Color(0xFFF59E0B)
     val LiveMode = Color(0xFFDC2626)
 
     val ExchangeSlBg = Color(0xFF0D47A1)

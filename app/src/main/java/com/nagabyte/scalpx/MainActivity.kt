@@ -73,7 +73,6 @@ class MainActivity : FragmentActivity() {
                     }
                     uiState.isSettingsOpen || !app.tradingRepository.isUserAuthenticated() -> {
                         SettingsSetupScreen(
-                            configStore = app.configStore,
                             repository = app.tradingRepository,
                             onSaved = {
                                 viewModel.handleIntent(ScalperIntent.OpenSettings(false))

@@ -189,12 +189,13 @@ class ScalperViewModel(
             is ScalperIntent.ConnectFlattrade -> openDailyOtpSheet()
             is ScalperIntent.OpenDailyOtpSheet -> openDailyOtpSheet()
             is ScalperIntent.DismissDailyOtpSheet -> dismissDailyOtpSheet()
-            is ScalperIntent.UpdateOtpDigits -> updateOtpDigits(intent.digits)
-            is ScalperIntent.SubmitDailyOtp -> submitDailyOtp()
+            is ScalperIntent.UpdateOtpDigits -> Unit
+            is ScalperIntent.SubmitDailyOtp -> Unit
             is ScalperIntent.LaunchBrowserOAuthFallback -> handleLaunchBrowserOAuthFallback()
             is ScalperIntent.DismissAlert -> _uiState.update { it.copy(criticalAlert = null) }
             is ScalperIntent.RefreshHealth -> refreshHealth()
             is ScalperIntent.RefreshOptionChain -> refreshOptionChain()
+            is ScalperIntent.RefreshSensexSpot -> refreshSensexSpot()
             is ScalperIntent.DeepLinkReceived -> handleDeepLink(intent)
             is ScalperIntent.ToggleKeepScreenOn -> _uiState.update { it.copy(keepScreenOn = intent.enabled) }
             is ScalperIntent.OpenSettings -> _uiState.update { it.copy(isSettingsOpen = intent.open) }
@@ -573,74 +574,6 @@ class ScalperViewModel(
         }
     }
 
-    private fun updateOtpDigits(digits: String) {
-        val filtered = digits.filter { it.isDigit() }.take(6)
-        _uiState.update {
-            it.copy(
-                dailyOtpSheet = it.dailyOtpSheet.copy(
-                    otpDigits = filtered,
-                    errorMessage = null
-                )
-            )
-        }
-
-        if (filtered.length == 6 && !_uiState.value.dailyOtpSheet.isSubmitting) {
-            submitDailyOtp()
-        }
-    }
-
-    private fun submitDailyOtp() {
-        val currentOtp = _uiState.value.dailyOtpSheet.otpDigits
-        if (currentOtp.length != 6 || _uiState.value.dailyOtpSheet.isSubmitting) {
-            return
-        }
-
-        _uiState.update {
-            it.copy(
-                dailyOtpSheet = it.dailyOtpSheet.copy(
-                    isSubmitting = true,
-                    errorMessage = null
-                )
-            )
-        }
-
-        viewModelScope.launch {
-            when (val result = repository.submitDailyOtp(currentOtp)) {
-                is ApiResult.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            dailyOtpSheet = DailyOtpSheetState(isVisible = false, otpDigits = "")
-                        )
-                    }
-                    _uiEffect.emit(ScalperUiEffect.TriggerHaptic())
-                    _uiEffect.emit(ScalperUiEffect.ShowToast("Daily login successful"))
-                    refreshHealth()
-                    reconnectFeed()
-                    refreshOptionChain()
-                }
-                is ApiResult.Error -> {
-                    val isInvalidOtp = result.errorCode == "INVALID_OTP" || result.statusCode == 401
-                    val isFallback = result.errorCode == "FALLBACK_REQUIRED" || result.statusCode == 502
-
-                    _uiState.update { current ->
-                        current.copy(
-                            dailyOtpSheet = current.dailyOtpSheet.copy(
-                                isSubmitting = false,
-                                otpDigits = if (isInvalidOtp) "" else current.dailyOtpSheet.otpDigits,
-                                errorMessage = result.message,
-                                suggestBrowserFallback = if (isFallback) true else current.dailyOtpSheet.suggestBrowserFallback
-                            )
-                        )
-                    }
-
-                    if (isInvalidOtp) {
-                        _uiEffect.emit(ScalperUiEffect.TriggerHaptic(isImportant = true))
-                    }
-                }
-            }
-        }
-    }
-
     private fun handleLaunchBrowserOAuthFallback() {
         dismissDailyOtpSheet()
         viewModelScope.launch {
@@ -676,6 +609,7 @@ class ScalperViewModel(
                 // Spot and contract metadata must come from broker market/instrument data.
                 // Clear the prior index value so an old spot cannot select the wrong ATM.
                 spotLtpPaise = 0L,
+                spotStatus = if (index == "SENSEX") "WAITING_FOR_TICK" else "UNAVAILABLE",
                 strikes = persistentListOf(),
                 selectedExpiry = "",
                 selectedStrike = null,
@@ -693,7 +627,6 @@ class ScalperViewModel(
                     val s = result.data
                     _uiState.update {
                         it.copy(
-                            brokerMode = (s.brokerMode ?: "LIVE").uppercase(),
                             brokerConnected = s.brokerConnected,
                             sessionTokenPresent = s.sessionTokenPresent,
                             sessionValid = s.sessionValid,
@@ -705,7 +638,7 @@ class ScalperViewModel(
                             userId = repository.configStore.getDeviceId()
                         )
                     }
-                    if (s.brokerMode.equals("live", ignoreCase = true) && s.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
+                    if (s.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
                         openDailyOtpSheet()
                     }
                 }
@@ -716,7 +649,6 @@ class ScalperViewModel(
                             val h = healthResult.data
                             _uiState.update {
                                 it.copy(
-                                    brokerMode = h.brokerMode.uppercase(),
                                     brokerConnected = h.brokerConnected,
                                     wsFeedHealthy = h.wsFeedHealthy,
                                     tradingEnabled = h.tradingEnabled,
@@ -728,7 +660,7 @@ class ScalperViewModel(
                                     userId = repository.configStore.getDeviceId()
                                 )
                             }
-                            if (h.brokerMode.equals("live", ignoreCase = true) && h.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
+                            if (h.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
                                 openDailyOtpSheet()
                             }
                         }
@@ -795,6 +727,29 @@ class ScalperViewModel(
                     _uiState.update {
                         it.copy(strikes = persistentListOf(), selectedStrike = null, selectedCallStrike = null, selectedPutStrike = null)
                     }
+                }
+            }
+        }
+    }
+
+    fun refreshSensexSpot() {
+        if (_uiState.value.selectedIndex != "SENSEX" || !repository.isUserAuthenticated()) return
+        viewModelScope.launch {
+            when (val result = repository.getSensexSpot()) {
+                is ApiResult.Success -> {
+                    val spot = result.data
+                    val readyLtp = spot.spotLtpPaise?.takeIf {
+                        spot.status == "READY" && spot.marketDataReady && it > 0L
+                    }
+                    _uiState.update {
+                        it.copy(
+                            spotLtpPaise = readyLtp ?: 0L,
+                            spotStatus = if (readyLtp != null) "READY" else spot.status
+                        )
+                    }
+                }
+                is ApiResult.Error -> _uiState.update {
+                    it.copy(spotLtpPaise = 0L, spotStatus = "UNAVAILABLE")
                 }
             }
         }

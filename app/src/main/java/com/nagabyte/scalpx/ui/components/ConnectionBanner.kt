@@ -30,7 +30,6 @@ import com.nagabyte.scalpx.ui.theme.TradingTypography
 
 @Composable
 fun ConnectionBanner(
-    brokerMode: String,
     serverWsState: WsState,
     brokerConnected: Boolean,
     wsFeedHealthy: Boolean,
@@ -58,14 +57,13 @@ fun ConnectionBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // PAPER / LIVE Mode Pill
-                val isLive = brokerMode.equals("LIVE", ignoreCase = true)
+                // Live-only environment label
                 Surface(
-                    color = if (isLive) TradingColors.LiveMode else TradingColors.PaperMode,
+                    color = TradingColors.LiveMode,
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
-                        text = if (isLive) "LIVE" else "PAPER",
+                        text = "LIVE",
                         color = Color.Black,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
@@ -224,8 +222,7 @@ fun ConnectionBanner(
 @Composable
 fun ConnectionBannerPreview() {
     ConnectionBanner(
-        brokerMode = "PAPER",
-        serverWsState = WsState.CONNECTED,
+                serverWsState = WsState.CONNECTED,
         brokerConnected = true,
         wsFeedHealthy = true,
         pingMs = 14L
@@ -236,8 +233,7 @@ fun ConnectionBannerPreview() {
 @Composable
 fun ConnectionBannerStalePreview() {
     ConnectionBanner(
-        brokerMode = "LIVE",
-        serverWsState = WsState.CONNECTED,
+                serverWsState = WsState.CONNECTED,
         brokerConnected = true,
         wsFeedHealthy = false,
         pingMs = 38L

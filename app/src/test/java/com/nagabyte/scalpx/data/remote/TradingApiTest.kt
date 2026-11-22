@@ -45,7 +45,7 @@ class TradingApiTest {
                 .setBody("""
                     {
                         "status": "ok",
-                        "brokerMode": "live",
+                        "environment": "LIVE",
                         "brokerConnected": true,
                         "wsFeedHealthy": true,
                         "openPositionsCount": 1,
@@ -57,7 +57,7 @@ class TradingApiTest {
 
         val health = tradingApi.getHealth()
         assertEquals("ok", health.status)
-        assertEquals("live", health.brokerMode)
+        assertEquals("LIVE", health.environment)
         assertTrue(health.brokerConnected)
 
         val recordedRequest = mockWebServer.takeRequest()
@@ -201,73 +201,37 @@ class TradingApiTest {
     }
 
     @Test
-    fun `dailyLogin submits OTP and receives DailyLoginResponse`() = runBlocking {
+    fun `authenticateDevice sends device UUID and TOTP without exposing code in request logs`() = runBlocking {
         mockWebServer.enqueue(
-            MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody("""
-                    {
-                        "status": "ok",
-                        "message": "Daily Flattrade authentication successful",
-                        "brokerConnected": true,
-                        "tradeDate": "2026-11-21",
-                        "tokenGeneratedAt": "2026-11-21T09:15:00.000Z"
-                    }
-                """.trimIndent())
+            MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
+                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900,"device":{"id":"test-device-uuid-1234","name":"Android Trading Phone","status":"AUTHORIZED"}}""")
         )
-
-        val response = tradingApi.dailyLogin(DailyLoginRequest(otp = "123456"))
+        val response = tradingApi.authenticateDevice(
+            DeviceAuthenticationRequest(deviceId = "test-device-uuid-1234", totp = "123456", deviceName = "Android Trading Phone")
+        )
         assertTrue(response.isSuccessful)
-        val body = response.body()
-        assertNotNull(body)
-        assertEquals(true, body?.brokerConnected)
-        assertEquals("2026-11-21", body?.tradeDate)
-
+        assertEquals("short-lived-jwt", response.body()?.accessToken)
+        assertEquals(900, response.body()?.expiresIn)
         val recorded = mockWebServer.takeRequest()
-        assertEquals("/api/auth/daily-login", recorded.path)
+        assertEquals("/api/auth/device/authenticate", recorded.path)
         assertEquals("POST", recorded.method)
-        assertEquals("Bearer test-jwt-token-xyz", recorded.getHeader("Authorization"))
+        assertTrue(recorded.body.readUtf8().contains("\"totp\":\"123456\""))
         assertEquals("test-device-uuid-1234", recorded.getHeader("X-Device-Id"))
     }
 
     @Test
-    fun `provisionDevice sends enrollmentSecret and receives device-bound JWT`() = runBlocking {
+    fun `getSensexSpot parses only the backend fresh-quote status`() = runBlocking {
         mockWebServer.enqueue(
-            MockResponse()
-                .setResponseCode(200)
-                .setHeader("Content-Type", "application/json")
-                .setBody("""
-                    {
-                        "status": "ok",
-                        "token": "device-bound-jwt-9999",
-                        "deviceId": "test-device-uuid-1234",
-                        "expiresAt": 1735000000000
-                    }
-                """.trimIndent())
+            MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
+                .setBody("""{"index":"SENSEX","exchange":"BSE","token":"789","status":"READY","spotLtpPaise":8123456,"timestamp":1795375000000,"ageMs":120,"marketDataReady":true,"validation":"TOKEN_FROM_FLATTRADE_GETINDEXLIST"}""")
         )
-
-        val response = tradingApi.provisionDevice(
-            ProvisionDeviceRequest(
-                enrollmentSecret = "owner-enrollment-secret-xyz",
-                deviceName = "Android Trading Phone"
-            )
-        )
-
-        assertTrue(response.isSuccessful)
-        val body = response.body()
-        assertNotNull(body)
-        assertEquals("ok", body?.status)
-        assertEquals("device-bound-jwt-9999", body?.token)
-        assertEquals("test-device-uuid-1234", body?.deviceId)
-        assertEquals(1735000000000L, body?.expiresAt)
-
-        val recorded = mockWebServer.takeRequest()
-        assertEquals("/api/auth/provision-device", recorded.path)
-        assertEquals("POST", recorded.method)
-        val bodyStr = recorded.body.readUtf8()
-        assertTrue(bodyStr.contains("\"enrollmentSecret\":\"owner-enrollment-secret-xyz\""))
-        assertTrue(bodyStr.contains("\"deviceName\":\"Android Trading Phone\""))
+        val spot = tradingApi.getSensexSpot()
+        assertEquals("SENSEX", spot.index)
+        assertEquals("BSE", spot.exchange)
+        assertEquals("READY", spot.status)
+        assertEquals(8123456L, spot.spotLtpPaise)
+        assertTrue(spot.marketDataReady)
+        assertEquals("/api/market-data/sensex", mockWebServer.takeRequest().path)
     }
 
     @Test
@@ -279,7 +243,7 @@ class TradingApiTest {
                 .setBody("""
                     {
                         "status": "ok",
-                        "brokerMode": "paper",
+                        "environment": "LIVE",
                         "brokerConnected": true,
                         "wsFeedHealthy": true,
                         "tradingEnabled": false,
@@ -294,7 +258,7 @@ class TradingApiTest {
 
         val health = tradingApi.getHealth()
         assertEquals("ok", health.status)
-        assertEquals("paper", health.brokerMode)
+        assertEquals("LIVE", health.environment)
         assertFalse(health.tradingEnabled)
         assertEquals("FEED_CONNECTED", health.wsFeedStatus)
         assertFalse(health.accountStateUncertain)

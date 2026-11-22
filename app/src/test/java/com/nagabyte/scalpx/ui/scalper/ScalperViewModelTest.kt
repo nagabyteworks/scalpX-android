@@ -316,7 +316,6 @@ class ScalperViewModelTest {
     fun `stored but invalid session opens authentication sheet`() = runTest(testDispatcher) {
         fakeRepo.healthBrokerConnected = false
         fakeRepo.healthSessionValidity = "INVALID"
-        fakeRepo.healthBrokerMode = "live"
         val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
         testScheduler.advanceUntilIdle()
 
@@ -339,7 +338,6 @@ class ScalperViewModelTest {
         var healthTradingEnabled = true
         var healthBrokerConnected = true
         var healthSessionValidity = "VALID"
-        var healthBrokerMode = "paper"
         var healthAccountStateUncertain = false
         var healthWsFeedStatus = "FEED_CONNECTED"
 
@@ -367,7 +365,7 @@ class ScalperViewModelTest {
             return ApiResult.Success(
                 HealthDto(
                     status = "ok",
-                    brokerMode = "paper",
+                    environment = "LIVE",
                     brokerConnected = healthBrokerConnected,
                     wsFeedHealthy = true,
                     tradingEnabled = healthTradingEnabled,
@@ -386,7 +384,7 @@ class ScalperViewModelTest {
                 brokerConnected = healthBrokerConnected,
                 wsFeedHealthy = healthBrokerConnected,
                 wsFeedStatus = healthWsFeedStatus,
-                brokerMode = healthBrokerMode,
+                environment = "LIVE",
                 tradingEnabled = healthTradingEnabled,
                 sessionTokenPresent = true,
                 sessionValid = healthBrokerConnected,
@@ -505,11 +503,12 @@ class ScalperViewModelTest {
             }
 
             private fun createDummyApi(): TradingApi = object : TradingApi {
-                override suspend fun provisionDevice(request: ProvisionDeviceRequest) = throw NotImplementedError()
+                override suspend fun authenticateDevice(request: DeviceAuthenticationRequest) = throw NotImplementedError()
                 override suspend fun getHealth() = throw NotImplementedError()
+                override suspend fun getAppConfig() = throw NotImplementedError()
                 override suspend fun getAuthStatus() = throw NotImplementedError()
+                override suspend fun getSensexSpot() = throw NotImplementedError()
                 override suspend fun getLoginUrl() = throw NotImplementedError()
-                override suspend fun dailyLogin(request: DailyLoginRequest) = throw NotImplementedError()
                 override suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int) = throw NotImplementedError()
                 override suspend fun placeOneClickOrder(request: OneClickOrderRequest) = throw NotImplementedError()
                 override suspend fun patchLadder(token: String, request: PatchLadderRequest) = throw NotImplementedError()

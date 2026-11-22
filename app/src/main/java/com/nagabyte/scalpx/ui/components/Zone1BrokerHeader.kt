@@ -26,17 +26,15 @@ import com.nagabyte.scalpx.ui.theme.TradingTypography
 
 /**
  * Zone 1: Pinned Top Header Bar (~44dp height)
- * Left: "Broker: Flattrade (<USER_ID>)" + Mode Badge (PAPER/LIVE)
- * Right: WS ping dot + Latency + Daily OTP button (if disconnected) + Theme toggle + Settings
+ * Left: "Broker: Flattrade (<USER_ID>)" + LIVE environment badge
+ * Right: WS ping dot + latency + Flattrade reconnect button + Theme toggle + Settings
  */
 @Composable
 fun Zone1BrokerHeader(
-    brokerMode: String,
     serverWsState: WsState,
     brokerConnected: Boolean,
     wsFeedHealthy: Boolean,
     pingMs: Long,
-    userId: String,
     isDarkTheme: Boolean,
     onConnectOtp: () -> Unit,
     onToggleTheme: (Boolean) -> Unit,
@@ -59,15 +57,14 @@ fun Zone1BrokerHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Broker Name + User ID + Mode Badge
+            // Left: Broker Name + User ID + LIVE environment badge
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.weight(1f, fill = false)
             ) {
-                val userLabel = if (userId.isNotBlank()) " ($userId)" else ""
                 Text(
-                    text = "Broker: Flattrade$userLabel",
+                    text = "Broker: Flattrade",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary,
@@ -75,10 +72,9 @@ fun Zone1BrokerHeader(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                val isLive = brokerMode.equals("LIVE", ignoreCase = true)
-                val badgeBg = if (isLive) colors.liveMode.copy(alpha = 0.15f) else colors.paperMode.copy(alpha = 0.15f)
-                val badgeTextColor = if (isLive) colors.liveMode else colors.paperMode
-                val badgeBorderColor = if (isLive) colors.liveMode else colors.paperMode
+                val badgeBg = colors.liveMode.copy(alpha = 0.15f)
+                val badgeTextColor = colors.liveMode
+                val badgeBorderColor = colors.liveMode
 
                 Box(
                     modifier = Modifier
@@ -88,7 +84,7 @@ fun Zone1BrokerHeader(
                         .padding(horizontal = 5.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = if (isLive) "LIVE" else "PAPER",
+                        text = "LIVE",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
                         color = badgeTextColor
@@ -96,7 +92,7 @@ fun Zone1BrokerHeader(
                 }
             }
 
-            // Right: Connection Dot & Ping + OTP Connect + Theme + Settings
+            // Right: connection state + Flattrade reconnect + theme + settings
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -104,7 +100,7 @@ fun Zone1BrokerHeader(
                 // WS Dot + Ping
                 val dotColor = when {
                     serverWsState == WsState.CONNECTED && wsFeedHealthy -> colors.buyGreen
-                    serverWsState == WsState.CONNECTING -> colors.paperMode
+                    serverWsState == WsState.CONNECTING -> colors.warningColor
                     else -> colors.sellRed
                 }
 
@@ -126,7 +122,7 @@ fun Zone1BrokerHeader(
                     )
                 }
 
-                // If broker not connected, show prominent OTP login chip
+                // Broker authentication uses Flattrade's official browser flow.
                 if (!brokerConnected) {
                     Button(
                         onClick = onConnectOtp,
@@ -140,12 +136,12 @@ fun Zone1BrokerHeader(
                     ) {
                         Icon(
                             imageVector = Icons.Default.LockOpen,
-                            contentDescription = "Connect OTP",
+                            contentDescription = "Connect Flattrade",
                             modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "OTP Login",
+                            text = "Connect Broker",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )

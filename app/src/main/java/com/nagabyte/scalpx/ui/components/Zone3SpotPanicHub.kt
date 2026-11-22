@@ -34,8 +34,6 @@ fun Zone3SpotPanicHub(
     modifier: Modifier = Modifier
 ) {
     val colors = ScalperTheme.colors
-    val isPositive = spotChangePts >= 0
-    val changeColor = if (isPositive) colors.profitGreenText else colors.lossRedText
 
     Column(
         modifier = modifier
@@ -63,16 +61,14 @@ fun Zone3SpotPanicHub(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                val formattedLtp = MoneyFormatter.formatPaise(spotLtpPaise)
-                val sign = if (isPositive) "+" else ""
-                val ptsText = String.format("%.2f", spotChangePts)
-                val pctText = String.format("%.2f", spotChangePercent)
+                val liveSpotAvailable = spotLtpPaise > 0L
+                val formattedLtp = if (liveSpotAvailable) MoneyFormatter.formatPaise(spotLtpPaise) else "--"
 
                 Text(
-                    text = "LTP: $formattedLtp ($sign$ptsText/$sign$pctText%)",
+                    text = if (liveSpotAvailable) "LTP: $formattedLtp" else "Waiting for live spot",
                     style = TradingTypography.TabularDigitsBold,
                     fontSize = 11.sp,
-                    color = changeColor,
+                    color = if (liveSpotAvailable) colors.textPrimary else colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

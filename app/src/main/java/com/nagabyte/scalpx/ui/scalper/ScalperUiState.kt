@@ -105,7 +105,6 @@ data class DailyOtpSheetState(
 
 @Immutable
 data class ScalperUiState(
-    val brokerMode: String = "PAPER",
     val serverWsState: WsState = WsState.DISCONNECTED,
     val brokerConnected: Boolean = false,
     val sessionTokenPresent: Boolean = false,
@@ -133,6 +132,7 @@ data class ScalperUiState(
     val product: String = "MIS",
 
     val spotLtpPaise: Long = 0L,
+    val spotStatus: String = "WAITING_FOR_TICK",
     val spotChangePts: Double = 0.0,
     val spotChangePercent: Double = 0.0,
 

@@ -73,6 +73,7 @@ sealed interface ScalperIntent {
 
     object RefreshHealth : ScalperIntent
     object RefreshOptionChain : ScalperIntent
+    object RefreshSensexSpot : ScalperIntent
     data class DeepLinkReceived(val uri: Uri) : ScalperIntent
 
     data class ToggleKeepScreenOn(val enabled: Boolean) : ScalperIntent

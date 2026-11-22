@@ -75,47 +75,36 @@ open class TradingRepository(
     fun isUserAuthenticated(): Boolean = !configStore.getJwtToken().isNullOrBlank()
     fun saveJwtToken(token: String?) = configStore.setJwtToken(token)
 
-    open fun clearAuth() {
-        configStore.clearAuth()
-        disconnectWebSocket()
-    }
-
-    open suspend fun provisionDevice(
-        enrollmentSecret: String,
-        deviceName: String = "Android Device"
-    ): ApiResult<ProvisionDeviceResponse> {
+    open suspend fun authenticateDevice(totp: String): ApiResult<DeviceAuthenticationResponse> {
         return try {
-            val response = api.provisionDevice(
-                ProvisionDeviceRequest(
-                    enrollmentSecret = enrollmentSecret.trim(),
-                    deviceName = deviceName.trim()
+            val response = api.authenticateDevice(
+                DeviceAuthenticationRequest(
+                    deviceId = configStore.getDeviceId(),
+                    totp = totp,
+                    deviceName = "Android device"
                 )
             )
             if (response.isSuccessful) {
                 val body = response.body()
-                if (body != null) {
-                    configStore.setJwtToken(body.token)
+                if (body == null) ApiResult.Error("Empty authentication response", response.code())
+                else {
+                    configStore.setJwtToken(body.accessToken)
                     ApiResult.Success(body)
-                } else {
-                    ApiResult.Error("Empty response body from device provisioning", response.code())
                 }
             } else {
-                val code = response.code()
-                val errorBody = response.errorBody()?.string() ?: ""
-                val msg = when (code) {
-                    401 -> "Invalid device enrollment secret"
-                    403 -> "Device not authorized or enrollment rejected"
-                    429 -> "Provisioning rate limited. Please wait."
-                    else -> "Device provisioning failed ($code): $errorBody"
-                }
-                ApiResult.Error(message = msg, statusCode = code)
+                val message = response.errorBody()?.string()?.let { body ->
+                    runCatching { json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull()
+                }.orEmpty()
+                ApiResult.Error(message.ifBlank { "Device authentication failed (${response.code()})" }, response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(
-                message = e.localizedMessage ?: "Network error during device provisioning",
-                cause = e
-            )
+            ApiResult.Error(e.localizedMessage ?: "Network error during device authentication", cause = e)
         }
+    }
+
+    open fun clearAuth() {
+        configStore.clearAuth()
+        disconnectWebSocket()
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -124,57 +113,16 @@ open class TradingRepository(
         api.getHealth()
     }
 
-    open suspend fun getLoginUrl(): ApiResult<String> = safeApiCall {
-        api.getLoginUrl().loginUrl
+    open suspend fun getAppConfig(): ApiResult<AppConfigDto> = safeApiCall {
+        api.getAppConfig()
     }
 
-    open suspend fun submitDailyOtp(otp: String): ApiResult<DailyLoginResponse> {
-        return try {
-            val response = api.dailyLogin(DailyLoginRequest(otp = otp))
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body != null) {
-                    ApiResult.Success(body)
-                } else {
-                    ApiResult.Error("Empty response body from daily login", response.code())
-                }
-            } else {
-                val code = response.code()
-                val errorBodyStr = response.errorBody()?.string() ?: ""
-                var parsedError = ""
-                var fallbackRequired = false
-                try {
-                    val jsonElement = json.parseToJsonElement(errorBodyStr).jsonObject
-                    parsedError = jsonElement["error"]?.jsonPrimitive?.content
-                        ?: jsonElement["message"]?.jsonPrimitive?.content
-                        ?: errorBodyStr
-                    fallbackRequired = jsonElement["fallbackRequired"]?.jsonPrimitive?.content?.toBoolean() ?: false
-                } catch (_: Exception) {
-                    parsedError = errorBodyStr
-                }
+    open suspend fun getSensexSpot(): ApiResult<SensexSpotDto> = safeApiCall {
+        api.getSensexSpot()
+    }
 
-                val errorCode = when {
-                    code == 400 -> "INVALID_OTP_FORMAT"
-                    code == 401 -> "INVALID_OTP"
-                    code == 429 -> "LOGIN_RATE_LIMITED"
-                    code == 502 && (fallbackRequired || parsedError.contains("fallback", ignoreCase = true)) -> "FALLBACK_REQUIRED"
-                    code == 502 -> "FALLBACK_REQUIRED"
-                    else -> "BROKER_ERROR"
-                }
-
-                val displayMessage = if (parsedError.isNotBlank()) parsedError else "Login failed ($code)"
-                ApiResult.Error(
-                    message = displayMessage,
-                    statusCode = code,
-                    errorCode = errorCode
-                )
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(
-                message = e.localizedMessage ?: "Network error during daily login",
-                cause = e
-            )
-        }
+    open suspend fun getLoginUrl(): ApiResult<String> = safeApiCall {
+        api.getLoginUrl().loginUrl
     }
 
     open suspend fun getAuthStatus(): ApiResult<AuthStatusResponse> = safeApiCall {
