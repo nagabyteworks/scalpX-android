@@ -4,7 +4,8 @@
   "description": "scalpX - Personal One-Click Options Scalper Android App",
   "scripts": {
     "start": "npm run run",
-    "run": "gradlew installDebug && adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
+    "run1": "./gradlew installDebug && $HOME/Library/Android/sdk/platform-tools/adb shell monkey -p com.nagabyte.scalpx -c android.intent.category.LAUNCHER 1",
+    "run2": "gradlew installDebug && adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
     "run:phone": "gradlew installDebug && adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
     "install": "gradlew installDebug",
     "launch": "adb shell am start -n com.nagabyte.scalpx/com.nagabyte.scalpx.MainActivity",
