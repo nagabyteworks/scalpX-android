@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.*
@@ -342,11 +343,77 @@ class ScalperViewModelTest {
         fakeRepo.waitingSpotResponses = 1
 
         val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
-        testScheduler.advanceUntilIdle()
+        runCurrent()
+        assertEquals(1, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(999)
+        runCurrent()
+        assertEquals(1, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(1)
+        runCurrent()
 
-        assertTrue(fakeRepo.indexSpotCallCount >= 2)
+        assertEquals(2, fakeRepo.indexSpotCallCount)
         assertEquals(1, fakeRepo.optionChainCallCount)
         assertEquals("READY", viewModel.uiState.value.spotStatus)
+    }
+
+    @Test
+    fun `spot retry uses capped exponential backoff and manual retry resets it`() = runTest(testDispatcher) {
+        fakeRepo.waitingSpotResponses = 20
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+
+        runCurrent()
+        assertEquals(1, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(2, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(1_999)
+        runCurrent()
+        assertEquals(2, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(3, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(4_000)
+        runCurrent()
+        assertEquals(4, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(8_000)
+        runCurrent()
+        assertEquals(5, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(16_000)
+        runCurrent()
+        assertEquals(6, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(29_999)
+        runCurrent()
+        assertEquals(6, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(7, fakeRepo.indexSpotCallCount)
+
+        fakeRepo.waitingSpotResponses = 1
+        viewModel.refreshSensexSpot()
+        runCurrent()
+        assertEquals(8, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(999)
+        runCurrent()
+        assertEquals(8, fakeRepo.indexSpotCallCount)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(9, fakeRepo.indexSpotCallCount)
+        assertEquals("READY", viewModel.uiState.value.spotStatus)
+    }
+
+    @Test
+    fun `manual spot retry cancels an in-flight request before starting another`() = runTest(testDispatcher) {
+        fakeRepo.spotRequestDelayMs = 10_000
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        runCurrent()
+        assertEquals(1, fakeRepo.activeSpotRequests)
+
+        viewModel.refreshSensexSpot()
+        runCurrent()
+
+        assertEquals(2, fakeRepo.indexSpotCallCount)
+        assertEquals(1, fakeRepo.activeSpotRequests)
+        assertEquals(1, fakeRepo.maxConcurrentSpotRequests)
     }
 
     @Test
@@ -391,6 +458,9 @@ class ScalperViewModelTest {
         var indexSpotCallCount = 0
         var optionChainCallCount = 0
         var waitingSpotResponses = 0
+        var spotRequestDelayMs = 0L
+        var activeSpotRequests = 0
+        var maxConcurrentSpotRequests = 0
         var lastSubmittedFirstMilestonePaise: Long? = null
         var lastSubmittedSide: String? = null
         var lastPatchedToken: String? = null
@@ -521,19 +591,26 @@ class ScalperViewModelTest {
 
         override suspend fun getIndexSpot(symbol: String): ApiResult<SensexSpotDto> {
             indexSpotCallCount++
-            val waiting = waitingSpotResponses > 0
-            if (waiting) waitingSpotResponses--
-            return ApiResult.Success(
-                SensexSpotDto(
-                    index = symbol,
-                    exchange = if (symbol == "SENSEX") "BSE" else "NSE",
-                    status = if (waiting) "WAITING_FOR_TICK" else "READY",
-                    spotLtpPaise = if (waiting) null else 8_200_000L,
-                    timestamp = if (waiting) null else System.currentTimeMillis(),
-                    ageMs = if (waiting) null else 0L,
-                    marketDataReady = !waiting
+            activeSpotRequests++
+            maxConcurrentSpotRequests = maxOf(maxConcurrentSpotRequests, activeSpotRequests)
+            try {
+                if (spotRequestDelayMs > 0) delay(spotRequestDelayMs)
+                val waiting = waitingSpotResponses > 0
+                if (waiting) waitingSpotResponses--
+                return ApiResult.Success(
+                    SensexSpotDto(
+                        index = symbol,
+                        exchange = if (symbol == "SENSEX") "BSE" else "NSE",
+                        status = if (waiting) "WAITING_FOR_TICK" else "READY",
+                        spotLtpPaise = if (waiting) null else 8_200_000L,
+                        timestamp = if (waiting) null else System.currentTimeMillis(),
+                        ageMs = if (waiting) null else 0L,
+                        marketDataReady = !waiting
+                    )
                 )
-            )
+            } finally {
+                activeSpotRequests--
+            }
         }
 
         override suspend fun executeOneClickOrder(

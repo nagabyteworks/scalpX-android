@@ -43,10 +43,15 @@ The layout is intentionally not a fixed-height screen: smaller devices scroll wh
 The Android client has no broker credentials and does not synthesize market
 prices. On cockpit startup it opens `/ws`, checks backend/broker status, and
 requests the selected index spot. If the broker has not delivered the first
-fresh tick yet, spot retrieval retries while the backend reports a transient
-waiting, stale, disconnected, or reconnecting state. A fresh spot automatically
-triggers the option-chain request; the backend returns verified expiries,
-contracts and lot sizes and selects the nearest available ATM CE/PE pair.
+fresh tick yet, spot retrieval retries while the backend reports a retryable
+waiting, stale, disconnected, or server/broker API failure. Retries use
+exponential delays starting at one second and capped at 30 seconds; they stop
+on success or non-retryable failures such as a confirmed invalid broker
+session. A successful fresh spot resets the delay and automatically triggers
+the option-chain request; the backend returns verified expiries, contracts and
+lot sizes and selects the nearest available ATM CE/PE pair. If spot data is
+unavailable, the ticker exposes a manual Retry spot action that cancels any
+pending request before starting a fresh attempt.
 
 Contract metadata is resolved only on the backend from Flattrade's current
 NFO/BFO index-derivatives Scrip Master. The app receives the actual listed

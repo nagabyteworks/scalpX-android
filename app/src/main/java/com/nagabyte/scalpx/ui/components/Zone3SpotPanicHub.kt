@@ -33,9 +33,11 @@ fun Zone3SpotPanicHub(
     lastServerMessageType: MessageType,
     onCloseAllPositions: () -> Unit,
     onCancelAllOrders: () -> Unit,
+    onRetrySpot: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = ScalperTheme.colors
+    val liveSpotAvailable = spotLtpPaise > 0L
 
     Column(
         modifier = modifier
@@ -63,7 +65,6 @@ fun Zone3SpotPanicHub(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                val liveSpotAvailable = spotLtpPaise > 0L
                 val formattedLtp = if (liveSpotAvailable) MoneyFormatter.formatPaise(spotLtpPaise) else "--"
 
                 Text(
@@ -137,14 +138,28 @@ fun Zone3SpotPanicHub(
             MessageType.ERROR -> colors.lossRedText
         }
 
-        Text(
-            text = "Message: $lastServerMessage",
-            fontSize = 10.sp,
-            color = msgColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Message: $lastServerMessage",
+                fontSize = 10.sp,
+                color = msgColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f)
+            )
+            if (!liveSpotAvailable) {
+                TextButton(
+                    onClick = onRetrySpot,
+                    modifier = Modifier.height(30.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text("Retry spot", fontSize = 10.sp)
+                }
+            }
+        }
     }
 }

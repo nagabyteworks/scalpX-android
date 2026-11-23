@@ -36,6 +36,7 @@ class ScalperViewModel(
     private val lastTapTimestamps = ConcurrentHashMap<String, Long>()
     private var optionChainRefreshJob: Job? = null
     private var spotRefreshJob: Job? = null
+    private var spotRetryDelayMs = SPOT_INITIAL_RETRY_DELAY_MS
     private var lastOptionChainAttemptAt = 0L
 
     init {
@@ -865,6 +866,7 @@ class ScalperViewModel(
 
     fun refreshSensexSpot() {
         val symbol = _uiState.value.selectedIndex
+        spotRetryDelayMs = SPOT_INITIAL_RETRY_DELAY_MS
         spotRefreshJob?.cancel()
         spotRefreshJob = viewModelScope.launch {
             while (_uiState.value.selectedIndex == symbol) {
@@ -894,11 +896,15 @@ class ScalperViewModel(
                         if (readyLtp != null && _uiState.value.strikes.isEmpty()) {
                             refreshOptionChain(force = false)
                         }
+                        if (readyLtp != null) spotRetryDelayMs = SPOT_INITIAL_RETRY_DELAY_MS
                         retry = readyLtp == null && spot.status in setOf(
                             "WAITING_FOR_TICK",
                             "STALE",
                             "RECONNECTING",
-                            "DISCONNECTED"
+                            "DISCONNECTED",
+                            "WEBSOCKET_NOT_CONNECTED",
+                            "SUBSCRIPTION_REJECTED",
+                            "BROKER_API_FAILURE"
                         )
                     }
                     is ApiResult.Error -> {
@@ -921,11 +927,16 @@ class ScalperViewModel(
                                 lastServerMessageType = MessageType.ERROR
                             )
                         }
-                        retry = true
+                        retry = result.errorCode != "BROKER_SESSION_UNAVAILABLE" &&
+                            ((result.errorCode != null && result.errorCode in RETRYABLE_SPOT_ERROR_CODES) ||
+                                result.statusCode == null ||
+                                result.statusCode >= 500)
                     }
                 }
                 if (!retry) break
-                delay(SPOT_REFRESH_INTERVAL_MS)
+                val retryDelayMs = spotRetryDelayMs
+                delay(retryDelayMs)
+                spotRetryDelayMs = (retryDelayMs * 2).coerceAtMost(SPOT_MAX_RETRY_DELAY_MS)
             }
         }
     }
@@ -975,6 +986,15 @@ class ScalperViewModel(
 
     companion object {
         const val TAP_COOLDOWN_MS = 500L
-        private const val SPOT_REFRESH_INTERVAL_MS = 1_000L
+        private const val SPOT_INITIAL_RETRY_DELAY_MS = 1_000L
+        private const val SPOT_MAX_RETRY_DELAY_MS = 30_000L
+        private val RETRYABLE_SPOT_ERROR_CODES = setOf(
+            "BROKER_API_FAILURE",
+            "INVALID_INDEX_RESPONSE",
+            "WEBSOCKET_NOT_CONNECTED",
+            "SUBSCRIPTION_REJECTED",
+            "STALE_MARKET_DATA",
+            "INITIAL_TICK_NOT_RECEIVED"
+        )
     }
 }

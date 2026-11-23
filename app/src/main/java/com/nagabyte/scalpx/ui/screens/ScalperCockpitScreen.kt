@@ -31,13 +31,6 @@ fun ScalperCockpitScreen(
 
     LaunchedEffect(Unit) {
         while (true) {
-            onIntent(ScalperIntent.RefreshSensexSpot)
-            delay(2_000)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
             delay(15_000)
             onIntent(ScalperIntent.RefreshHealth)
         }
@@ -152,7 +145,8 @@ fun ScalperCockpitScreen(
                         lastServerMessage = state.lastServerMessage,
                         lastServerMessageType = state.lastServerMessageType,
                         onCloseAllPositions = { onIntent(ScalperIntent.PanicExitAll) },
-                        onCancelAllOrders = { onIntent(ScalperIntent.CancelAllOrders) }
+                        onCancelAllOrders = { onIntent(ScalperIntent.CancelAllOrders) },
+                        onRetrySpot = { onIntent(ScalperIntent.RefreshSensexSpot) }
                     )
 
                     HorizontalDivider(color = colors.border, thickness = 1.dp)
