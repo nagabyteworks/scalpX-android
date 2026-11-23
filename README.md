@@ -23,6 +23,21 @@ Flattrade authentication is a separate browser flow:
 
 ---
 
+## Trading dashboard layout
+
+The main dashboard is implemented with Compose `Scaffold` in `ScalperCockpitScreen`.
+
+- The broker toolbar is the pinned `topBar` and remains directly below system UI.
+- `WindowInsets.safeDrawing` is applied by `Scaffold` so status, navigation, and cutout regions are accounted for.
+- The broker header additionally applies status-bar and display-cutout top insets.
+- The complete dashboard body uses a bounded, full-width/full-height column and vertical scrolling.
+- The positions, order-book, and trade-book section has a bounded content height inside the scrollable dashboard.
+- No dashboard section is removed or vertically centred.
+
+The layout is intentionally not a fixed-height screen: smaller devices scroll while larger devices expose more of the positions content. No mock market data or fake trading state is introduced by layout changes.
+
+---
+
 ## Testing & Verification
 - Unit tests cover ViewModel state flow, DTO serialization, OkHttp request headers, and error handling.
 - Run tests via Gradle:

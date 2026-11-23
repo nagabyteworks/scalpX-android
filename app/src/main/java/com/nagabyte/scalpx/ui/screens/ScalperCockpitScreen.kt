@@ -2,6 +2,8 @@ package com.nagabyte.scalpx.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -102,6 +104,7 @@ fun ScalperCockpitScreen(
         Scaffold(
             modifier = modifier.fillMaxSize(),
             containerColor = colors.background,
+            contentWindowInsets = WindowInsets.safeDrawing,
             topBar = {
                 // ZONE 1: Pinned Top Header Bar (~44dp)
                 Zone1BrokerHeader(
@@ -121,6 +124,7 @@ fun ScalperCockpitScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .background(colors.background)
+                    .verticalScroll(rememberScrollState())
             ) {
                 // ZONE 7: Emergency Alert Banner (if active)
                 state.criticalAlert?.let { alert ->
@@ -211,7 +215,11 @@ fun ScalperCockpitScreen(
                 )
 
                 // ZONE 6: Content Area (Mode 1: Mobile Cards | Mode 2: 15-Column Table | Order / Trade Books)
-                Box(modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 240.dp)
+                ) {
                     Zone6BookContent(
                         activeTab = state.activeTab,
                         isTableView = state.isTableView,
