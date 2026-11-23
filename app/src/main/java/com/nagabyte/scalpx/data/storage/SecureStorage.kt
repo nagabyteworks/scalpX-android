@@ -15,7 +15,6 @@ class SecureStorage(context: Context) : ConfigStore {
     override fun setServerBaseUrl(url: String) = delegate.setServerBaseUrl(url)
     override fun getJwtToken(): String? = delegate.getJwtToken()
     override fun setJwtToken(token: String?) = delegate.setJwtToken(token)
-    override fun getDeviceId(): String = delegate.getDeviceId()
     override fun clearAuth() = delegate.clearAuth()
 
     override fun getDefaultLots(): Int = delegate.getDefaultLots()

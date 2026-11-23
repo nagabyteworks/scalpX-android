@@ -62,13 +62,10 @@ class TradingWsClient(
             .replace("http://", "ws://")
             .replace("https://", "wss://")
         val token = configStore.getJwtToken() ?: ""
-        val deviceId = configStore.getDeviceId()
-
         // Strict header-based auth without query parameters
         val wsUrl = "$baseUrl/ws"
         val request = Request.Builder()
             .url(wsUrl)
-            .header("X-Device-Id", deviceId)
             .apply {
                 if (token.isNotBlank()) {
                     header("Authorization", "Bearer $token")

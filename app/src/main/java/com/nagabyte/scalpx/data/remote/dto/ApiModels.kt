@@ -28,7 +28,6 @@ data class AppConfigDto(
     val trading: TradingConfigDto = TradingConfigDto(),
     val broker: BrokerConfigDto = BrokerConfigDto(),
     val marketFeed: MarketFeedConfigDto = MarketFeedConfigDto(),
-    val device: DeviceStatusDto = DeviceStatusDto(),
     val features: FeatureConfigDto = FeatureConfigDto()
 )
 
@@ -39,30 +38,16 @@ data class BrokerConfigDto(val connected: Boolean = false, val sessionValidity: 
 @Serializable
 data class MarketFeedConfigDto(val connected: Boolean = false, val status: String = "DISCONNECTED")
 @Serializable
-data class DeviceStatusDto(val id: String = "", val status: String = "UNKNOWN")
-@Serializable
 data class FeatureConfigDto(val optionsTrading: Boolean = false, val positions: Boolean = false, val orderManagement: Boolean = false)
 
 @Serializable
-data class DeviceAuthenticationRequest(
-    val deviceId: String,
-    val totp: String,
-    val deviceName: String = "Android Device"
-)
+data class TotpAuthenticationRequest(val totp: String)
 
 @Serializable
-data class DeviceAuthenticationResponse(
+data class TotpAuthenticationResponse(
     val status: String = "ok",
     val accessToken: String,
-    val expiresIn: Int = 900,
-    val device: AuthenticatedDeviceDto
-)
-
-@Serializable
-data class AuthenticatedDeviceDto(
-    val id: String,
-    val name: String,
-    val status: String
+    val expiresIn: Int = 900
 )
 
 @Serializable

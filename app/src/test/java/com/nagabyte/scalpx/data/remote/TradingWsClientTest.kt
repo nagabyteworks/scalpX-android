@@ -31,8 +31,7 @@ class TradingWsClientTest {
         val port = mockWebServer.port
         fakeConfigStore = FakeConfigStore(
             baseUrl = "http://$host:$port",
-            jwtToken = "test-ws-token",
-            deviceId = "test-ws-device-id"
+            jwtToken = "test-ws-token"
         )
 
         okHttpClient = OkHttpClient.Builder().build()
@@ -146,7 +145,7 @@ class TradingWsClientTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/ws", recordedRequest.path)
         assertEquals("Bearer test-ws-token", recordedRequest.getHeader("Authorization"))
-        assertEquals("test-ws-device-id", recordedRequest.getHeader("X-Device-Id"))
+        assertEquals(null, recordedRequest.getHeader("X-Device-Id"))
     }
 
     @Test
@@ -180,14 +179,12 @@ class TradingWsClientTest {
 
     private class FakeConfigStore(
         private var baseUrl: String,
-        private var jwtToken: String?,
-        private var deviceId: String
+        private var jwtToken: String?
     ) : ConfigStore {
         override fun getServerBaseUrl(): String = baseUrl
         override fun setServerBaseUrl(url: String) { baseUrl = url }
         override fun getJwtToken(): String? = jwtToken
         override fun setJwtToken(token: String?) { jwtToken = token }
-        override fun getDeviceId(): String = deviceId
         override fun clearAuth() { jwtToken = null }
         override fun getDefaultLots(): Int = 2
         override fun setDefaultLots(lots: Int) {}

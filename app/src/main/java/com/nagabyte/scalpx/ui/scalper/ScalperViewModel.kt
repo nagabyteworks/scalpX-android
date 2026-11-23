@@ -634,8 +634,7 @@ class ScalperViewModel(
                             wsFeedHealthy = s.wsFeedHealthy,
                             tradingEnabled = s.tradingEnabled,
                             wsFeedStatus = s.wsFeedStatus,
-                            accountStateUncertain = s.accountStateUncertain,
-                            userId = repository.configStore.getDeviceId()
+                            accountStateUncertain = s.accountStateUncertain
                         )
                     }
                     if (s.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
@@ -656,8 +655,7 @@ class ScalperViewModel(
                                     accountStateUncertain = h.accountStateUncertain,
                                     sessionTokenPresent = h.sessionTokenPresent,
                                     sessionValid = h.sessionValid,
-                                    sessionValidity = h.sessionValidity,
-                                    userId = repository.configStore.getDeviceId()
+                                    sessionValidity = h.sessionValidity
                                 )
                             }
                             if (h.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {

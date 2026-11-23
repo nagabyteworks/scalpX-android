@@ -488,7 +488,6 @@ class ScalperViewModelTest {
                 override fun setServerBaseUrl(url: String) {}
                 override fun getJwtToken(): String? = "jwt"
                 override fun setJwtToken(token: String?) {}
-                override fun getDeviceId(): String = "device-1"
                 override fun clearAuth() {}
                 override fun getDefaultLots(): Int = 2
                 override fun setDefaultLots(lots: Int) {}
@@ -503,7 +502,7 @@ class ScalperViewModelTest {
             }
 
             private fun createDummyApi(): TradingApi = object : TradingApi {
-                override suspend fun authenticateDevice(request: DeviceAuthenticationRequest) = throw NotImplementedError()
+                override suspend fun authenticateTotp(request: TotpAuthenticationRequest) = throw NotImplementedError()
                 override suspend fun getHealth() = throw NotImplementedError()
                 override suspend fun getAppConfig() = throw NotImplementedError()
                 override suspend fun getAuthStatus() = throw NotImplementedError()

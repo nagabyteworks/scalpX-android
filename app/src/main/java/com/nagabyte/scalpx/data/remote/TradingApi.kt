@@ -14,10 +14,10 @@ import java.util.concurrent.TimeUnit
 
 interface TradingApi {
 
-    @POST("/api/auth/device/authenticate")
-    suspend fun authenticateDevice(
-        @Body request: DeviceAuthenticationRequest
-    ): Response<DeviceAuthenticationResponse>
+    @POST("/api/auth/daily-login")
+    suspend fun authenticateTotp(
+        @Body request: TotpAuthenticationRequest
+    ): Response<TotpAuthenticationResponse>
 
     @GET("/health")
     suspend fun getHealth(): HealthDto
@@ -94,7 +94,7 @@ interface TradingApi {
 
                 override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
                     val request = chain.request()
-                    return if (request.url.encodedPath.contains("api/auth/device/authenticate")) {
+                    return if (request.url.encodedPath.contains("api/auth/daily-login")) {
                         headerOnlyLogger.intercept(chain)
                     } else {
                         bodyLogger.intercept(chain)

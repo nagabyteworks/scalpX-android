@@ -5,12 +5,10 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.nagabyte.scalpx.BuildConfig
-import java.util.UUID
-
 /**
  * Android Keystore-backed Secure Encrypted Storage.
  * Invariant: Flattrade api_secret never touches the device.
- * Stores only the personal JWT, permanent X-Device-Id, and execution presets.
+ * Stores only the personal JWT and execution presets.
  */
 class SecureConfigStore(context: Context) : ConfigStore {
 
@@ -28,12 +26,6 @@ class SecureConfigStore(context: Context) : ConfigStore {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-
-        // Ensure permanent device ID is generated on first launch
-        if (prefs.getString(KEY_DEVICE_ID, null).isNullOrBlank()) {
-            val newId = UUID.randomUUID().toString()
-            prefs.edit().putString(KEY_DEVICE_ID, newId).apply()
-        }
     }
 
     override fun getServerBaseUrl(): String {
@@ -54,12 +46,6 @@ class SecureConfigStore(context: Context) : ConfigStore {
             prefs.edit().remove(KEY_JWT_TOKEN).apply()
         } else {
             prefs.edit().putString(KEY_JWT_TOKEN, token.trim()).apply()
-        }
-    }
-
-    override fun getDeviceId(): String {
-        return prefs.getString(KEY_DEVICE_ID, null) ?: UUID.randomUUID().toString().also {
-            prefs.edit().putString(KEY_DEVICE_ID, it).apply()
         }
     }
 
@@ -119,7 +105,6 @@ class SecureConfigStore(context: Context) : ConfigStore {
     companion object {
         private const val PREFS_NAME = "scalpx_secure_config"
         private const val KEY_JWT_TOKEN = "jwt_token"
-        private const val KEY_DEVICE_ID = "device_id"
 
         private const val KEY_DEFAULT_LOTS = "preset_default_lots"
         private const val KEY_FIRST_TARGET_PTS = "preset_first_target_pts"

@@ -5,7 +5,6 @@ interface ConfigStore {
     fun setServerBaseUrl(url: String)
     fun getJwtToken(): String?
     fun setJwtToken(token: String?)
-    fun getDeviceId(): String
     fun clearAuth()
 
     // Execution Presets

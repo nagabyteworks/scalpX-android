@@ -2,7 +2,7 @@
 
 ## 1. Architecture & Core Invariant
 - **Server-Authoritative Thin Client:** Zero trading logic, zero ratcheting SL math, and zero direct Flattrade API calls on the phone. The Android app ONLY renders backend `TradingSnapshot` state and sends user intents.
-- **No Secrets on Device:** Flattrade `api_key`, `api_secret`, and session `jKey` NEVER touch the Android app. The phone stores only the backend Base URL, personal HS256 JWT, and a generated `X-Device-Id` inside Android Keystore-backed encrypted storage.
+- **No Secrets on Device:** Flattrade `api_key`, `api_secret`, and session `jKey` NEVER touch the Android app. The phone stores only the backend Base URL and personal HS256 JWT in Android Keystore-backed encrypted storage.
 - **Pattern:** Strict Unidirectional Data Flow (MVI) with immutable `StateFlow<ScalperUiState>` and one-shot `SharedFlow<UiEffect>`.
 
 ## 2. Tech Stack (Current Stable)
@@ -13,7 +13,7 @@
 - **Concurrency:** Kotlin Coroutines + `StateFlow` / `SharedFlow`.
 
 ## 3. Backend Contract Alignment (Must Match `docs/api-contract.md`)
-- **Auth Headers:** Attach `Authorization: Bearer <JWT>` and `X-Device-Id: <uuid>` to every `/api/*` request and `/ws` handshake.
+- **Auth Headers:** Attach `Authorization: Bearer <JWT>` to every `/api/*` request and `/ws` handshake.
 - **REST Endpoints:**
   - `GET /health`
   - `GET /api/auth/login-url`

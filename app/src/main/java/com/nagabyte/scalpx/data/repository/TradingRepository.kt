@@ -75,15 +75,9 @@ open class TradingRepository(
     fun isUserAuthenticated(): Boolean = !configStore.getJwtToken().isNullOrBlank()
     fun saveJwtToken(token: String?) = configStore.setJwtToken(token)
 
-    open suspend fun authenticateDevice(totp: String): ApiResult<DeviceAuthenticationResponse> {
+    open suspend fun authenticateTotp(totp: String): ApiResult<TotpAuthenticationResponse> {
         return try {
-            val response = api.authenticateDevice(
-                DeviceAuthenticationRequest(
-                    deviceId = configStore.getDeviceId(),
-                    totp = totp,
-                    deviceName = "Android device"
-                )
-            )
+            val response = api.authenticateTotp(TotpAuthenticationRequest(totp = totp))
             if (response.isSuccessful) {
                 val body = response.body()
                 if (body == null) ApiResult.Error("Empty authentication response", response.code())

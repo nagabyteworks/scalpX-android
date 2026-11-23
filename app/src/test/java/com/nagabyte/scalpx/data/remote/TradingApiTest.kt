@@ -25,8 +25,7 @@ class TradingApiTest {
 
         fakeConfigStore = FakeConfigStore(
             baseUrl = mockWebServer.url("/").toString(),
-            jwtToken = "test-jwt-token-xyz",
-            deviceId = "test-device-uuid-1234"
+            jwtToken = "test-jwt-token-xyz"
         )
 
         val okHttpClient = TradingApi.createOkHttpClient(fakeConfigStore)
@@ -39,7 +38,7 @@ class TradingApiTest {
     }
 
     @Test
-    fun `AuthInterceptor attaches Authorization Bearer and X-Device-Id headers`() = runBlocking {
+    fun `AuthInterceptor attaches Authorization Bearer header`() = runBlocking {
         mockWebServer.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -65,7 +64,7 @@ class TradingApiTest {
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/health", recordedRequest.path)
         assertEquals("Bearer test-jwt-token-xyz", recordedRequest.getHeader("Authorization"))
-        assertEquals("test-device-uuid-1234", recordedRequest.getHeader("X-Device-Id"))
+        assertEquals(null, recordedRequest.getHeader("X-Device-Id"))
     }
 
     @Test
@@ -203,30 +202,27 @@ class TradingApiTest {
     }
 
     @Test
-    fun `authenticateDevice sends device UUID and TOTP without exposing code in request logs`() = runBlocking {
+    fun `authenticateTotp sends only the TOTP code`() = runBlocking {
         mockWebServer.enqueue(
             MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
-                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900,"device":{"id":"test-device-uuid-1234","name":"Android Trading Phone","status":"AUTHORIZED"}}""")
+                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900}""")
         )
-        val response = tradingApi.authenticateDevice(
-            DeviceAuthenticationRequest(deviceId = "test-device-uuid-1234", totp = "123456", deviceName = "Android Trading Phone")
-        )
+        val response = tradingApi.authenticateTotp(TotpAuthenticationRequest(totp = "123456"))
         assertTrue(response.isSuccessful)
         assertEquals("short-lived-jwt", response.body()?.accessToken)
         assertEquals(900, response.body()?.expiresIn)
         val recorded = mockWebServer.takeRequest()
-        assertEquals("/api/auth/device/authenticate", recorded.path)
+        assertEquals("/api/auth/daily-login", recorded.path)
         assertEquals("POST", recorded.method)
         assertTrue(recorded.body.readUtf8().contains("\"totp\":\"123456\""))
-        assertEquals("test-device-uuid-1234", recorded.getHeader("X-Device-Id"))
+        assertEquals(null, recorded.getHeader("X-Device-Id"))
     }
 
     @Test
-    fun `repository authenticates with the same stored device UUID shown by settings and sent in header`() = runBlocking {
-        val storedDeviceId = fakeConfigStore.getDeviceId()
+    fun `repository authenticates with TOTP and stores only the backend session`() = runBlocking {
         mockWebServer.enqueue(
             MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
-                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900,"device":{"id":"$storedDeviceId","name":"Android device","status":"AUTHORIZED"}}""")
+                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900}""")
         )
         val client = TradingApi.createOkHttpClient(fakeConfigStore)
         val repository = TradingRepository(
@@ -235,14 +231,13 @@ class TradingApiTest {
             configStore = fakeConfigStore
         )
 
-        val result = repository.authenticateDevice("123456")
+        val result = repository.authenticateTotp("123456")
         assertTrue(result is ApiResult.Success)
 
         val recorded = mockWebServer.takeRequest()
         val body = recorded.body.readUtf8()
-        assertTrue(body.contains("\"deviceId\":\"$storedDeviceId\""))
-        assertEquals(storedDeviceId, recorded.getHeader("X-Device-Id"))
-        assertEquals(storedDeviceId, repository.configStore.getDeviceId())
+        assertTrue(body.contains("\"totp\":\"123456\""))
+        assertEquals(null, recorded.getHeader("X-Device-Id"))
     }
 
     @Test
@@ -292,14 +287,12 @@ class TradingApiTest {
 
     private class FakeConfigStore(
         private var baseUrl: String,
-        private var jwtToken: String?,
-        private var deviceId: String
+        private var jwtToken: String?
     ) : ConfigStore {
         override fun getServerBaseUrl(): String = baseUrl
         override fun setServerBaseUrl(url: String) { baseUrl = url }
         override fun getJwtToken(): String? = jwtToken
         override fun setJwtToken(token: String?) { jwtToken = token }
-        override fun getDeviceId(): String = deviceId
         override fun clearAuth() { jwtToken = null }
         override fun getDefaultLots(): Int = 2
         override fun setDefaultLots(lots: Int) {}
