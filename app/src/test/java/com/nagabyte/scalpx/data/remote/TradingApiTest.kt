@@ -2,6 +2,8 @@ package com.nagabyte.scalpx.data.remote
 
 import com.nagabyte.scalpx.data.local.ConfigStore
 import com.nagabyte.scalpx.data.remote.dto.*
+import com.nagabyte.scalpx.data.repository.ApiResult
+import com.nagabyte.scalpx.data.repository.TradingRepository
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -217,6 +219,30 @@ class TradingApiTest {
         assertEquals("POST", recorded.method)
         assertTrue(recorded.body.readUtf8().contains("\"totp\":\"123456\""))
         assertEquals("test-device-uuid-1234", recorded.getHeader("X-Device-Id"))
+    }
+
+    @Test
+    fun `repository authenticates with the same stored device UUID shown by settings and sent in header`() = runBlocking {
+        val storedDeviceId = fakeConfigStore.getDeviceId()
+        mockWebServer.enqueue(
+            MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
+                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900,"device":{"id":"$storedDeviceId","name":"Android device","status":"AUTHORIZED"}}""")
+        )
+        val client = TradingApi.createOkHttpClient(fakeConfigStore)
+        val repository = TradingRepository(
+            api = TradingApi.create(mockWebServer.url("/").toString(), client),
+            wsClient = TradingWsClient(client, fakeConfigStore),
+            configStore = fakeConfigStore
+        )
+
+        val result = repository.authenticateDevice("123456")
+        assertTrue(result is ApiResult.Success)
+
+        val recorded = mockWebServer.takeRequest()
+        val body = recorded.body.readUtf8()
+        assertTrue(body.contains("\"deviceId\":\"$storedDeviceId\""))
+        assertEquals(storedDeviceId, recorded.getHeader("X-Device-Id"))
+        assertEquals(storedDeviceId, repository.configStore.getDeviceId())
     }
 
     @Test

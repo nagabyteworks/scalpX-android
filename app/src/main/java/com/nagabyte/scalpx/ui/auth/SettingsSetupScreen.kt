@@ -1,5 +1,9 @@
 package com.nagabyte.scalpx.ui.auth
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,6 +20,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,8 +30,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +51,8 @@ fun SettingsSetupScreen(
 ) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val deviceId = remember(repository) { repository.configStore.getDeviceId() }
     var totp by remember { mutableStateOf("") }
     var authenticating by remember { mutableStateOf(false) }
     var authenticated by remember { mutableStateOf(repository.isUserAuthenticated()) }
@@ -80,6 +89,14 @@ fun SettingsSetupScreen(
         StatusCard("Backend", backendStatus)
 
         if (!authenticated) {
+            DeviceIdCard(
+                deviceId = deviceId,
+                onCopy = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Device ID", deviceId))
+                    Toast.makeText(context, "Device ID copied", Toast.LENGTH_SHORT).show()
+                }
+            )
             Text("Authenticate device", color = Color.White, fontWeight = FontWeight.SemiBold)
             Text("Enter the current six digit code for your backend configured authenticator. The TOTP secret stays on the backend.", color = Color(0xFFB7C0CD), fontSize = 13.sp)
             OutlinedTextField(
@@ -132,6 +149,27 @@ fun SettingsSetupScreen(
             ) { Text("Connect Flattrade in browser") }
             error?.let { Text(it, color = Color(0xFFFF6B6B), fontSize = 13.sp) }
             Button(onClick = onSaved, modifier = Modifier.fillMaxWidth()) { Text("Open cockpit") }
+        }
+    }
+}
+
+@Composable
+private fun DeviceIdCard(deviceId: String, onCopy: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1D27))
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f).padding(vertical = 6.dp)) {
+                Text("Device ID", color = Color(0xFFB7C0CD), fontSize = 12.sp)
+                Text(deviceId, color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 10.sp, maxLines = 2)
+            }
+            TextButton(onClick = onCopy) {
+                Text("Copy", fontSize = 12.sp)
+            }
         }
     }
 }
