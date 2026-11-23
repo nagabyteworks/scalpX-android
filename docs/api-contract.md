@@ -1,31 +1,13 @@
 # scalpX Android API Contract
 
-## Session authentication
+## Direct startup
 
-Android sends:
-
-```json
-POST /api/auth/daily-login
-{ "totp": "123456" }
-```
-
-Android stores only the returned JWT in Android Keystore-backed encrypted storage. The TOTP, broker credentials, broker access tokens, and target-management state never remain on Android.
-
-No device ID is generated, transmitted, stored, or used for authentication.
+Android opens the trading cockpit without TOTP, device provisioning, device UUIDs, or an application bearer session.
+Broker credentials and broker access tokens remain backend-only.
 
 ## Protected REST requests
 
-All `/api/*` requests except `/api/auth/daily-login` and broker OAuth callbacks use:
-
-```text
-Authorization: Bearer <JWT>
-```
-
-WebSocket handshake:
-
-```text
-Authorization: Bearer <JWT>
-```
+Android sends ordinary HTTP REST requests and opens `/ws` without application-device authentication headers.
 
 ## REST endpoints
 

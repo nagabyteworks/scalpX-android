@@ -41,16 +41,6 @@ data class MarketFeedConfigDto(val connected: Boolean = false, val status: Strin
 data class FeatureConfigDto(val optionsTrading: Boolean = false, val positions: Boolean = false, val orderManagement: Boolean = false)
 
 @Serializable
-data class TotpAuthenticationRequest(val totp: String)
-
-@Serializable
-data class TotpAuthenticationResponse(
-    val status: String = "ok",
-    val accessToken: String,
-    val expiresIn: Int = 900
-)
-
-@Serializable
 data class LoginUrlResponse(
     val loginUrl: String
 )

@@ -38,7 +38,7 @@ class TradingApiTest {
     }
 
     @Test
-    fun `AuthInterceptor attaches Authorization Bearer header`() = runBlocking {
+    fun `AuthInterceptor sends no application device header`() = runBlocking {
         mockWebServer.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -63,7 +63,7 @@ class TradingApiTest {
 
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/health", recordedRequest.path)
-        assertEquals("Bearer test-jwt-token-xyz", recordedRequest.getHeader("Authorization"))
+        assertEquals(null, recordedRequest.getHeader("Authorization"))
         assertEquals(null, recordedRequest.getHeader("X-Device-Id"))
     }
 
@@ -201,44 +201,6 @@ class TradingApiTest {
         assertEquals("Panic exit executed for all open positions", exitAll.message)
     }
 
-    @Test
-    fun `authenticateTotp sends only the TOTP code`() = runBlocking {
-        mockWebServer.enqueue(
-            MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
-                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900}""")
-        )
-        val response = tradingApi.authenticateTotp(TotpAuthenticationRequest(totp = "123456"))
-        assertTrue(response.isSuccessful)
-        assertEquals("short-lived-jwt", response.body()?.accessToken)
-        assertEquals(900, response.body()?.expiresIn)
-        val recorded = mockWebServer.takeRequest()
-        assertEquals("/api/auth/daily-login", recorded.path)
-        assertEquals("POST", recorded.method)
-        assertTrue(recorded.body.readUtf8().contains("\"totp\":\"123456\""))
-        assertEquals(null, recorded.getHeader("X-Device-Id"))
-    }
-
-    @Test
-    fun `repository authenticates with TOTP and stores only the backend session`() = runBlocking {
-        mockWebServer.enqueue(
-            MockResponse().setResponseCode(200).setHeader("Content-Type", "application/json")
-                .setBody("""{"status":"ok","accessToken":"short-lived-jwt","expiresIn":900}""")
-        )
-        val client = TradingApi.createOkHttpClient(fakeConfigStore)
-        val repository = TradingRepository(
-            api = TradingApi.create(mockWebServer.url("/").toString(), client),
-            wsClient = TradingWsClient(client, fakeConfigStore),
-            configStore = fakeConfigStore
-        )
-
-        val result = repository.authenticateTotp("123456")
-        assertTrue(result is ApiResult.Success)
-
-        val recorded = mockWebServer.takeRequest()
-        val body = recorded.body.readUtf8()
-        assertTrue(body.contains("\"totp\":\"123456\""))
-        assertEquals(null, recorded.getHeader("X-Device-Id"))
-    }
 
     @Test
     fun `getSensexSpot parses only the backend fresh-quote status`() = runBlocking {

@@ -14,11 +14,6 @@ import java.util.concurrent.TimeUnit
 
 interface TradingApi {
 
-    @POST("/api/auth/daily-login")
-    suspend fun authenticateTotp(
-        @Body request: TotpAuthenticationRequest
-    ): Response<TotpAuthenticationResponse>
-
     @GET("/health")
     suspend fun getHealth(): HealthDto
 
@@ -33,6 +28,9 @@ interface TradingApi {
 
     @GET("/api/market-data/sensex")
     suspend fun getSensexSpot(): SensexSpotDto
+
+    @GET("/api/market-data/index")
+    suspend fun getIndexSpot(@Query("symbol") symbol: String): SensexSpotDto
 
     @GET("/api/option-chain")
     suspend fun getOptionChain(
@@ -93,12 +91,7 @@ interface TradingApi {
                 }
 
                 override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
-                    val request = chain.request()
-                    return if (request.url.encodedPath.contains("api/auth/daily-login")) {
-                        headerOnlyLogger.intercept(chain)
-                    } else {
-                        bodyLogger.intercept(chain)
-                    }
+                    return bodyLogger.intercept(chain)
                 }
             }
 

@@ -72,29 +72,8 @@ open class TradingRepository(
     open fun disconnectWebSocket() = wsClient.disconnect()
     open fun onNetworkAvailable() = wsClient.onNetworkAvailable()
 
-    fun isUserAuthenticated(): Boolean = !configStore.getJwtToken().isNullOrBlank()
+    fun isUserAuthenticated(): Boolean = true
     fun saveJwtToken(token: String?) = configStore.setJwtToken(token)
-
-    open suspend fun authenticateTotp(totp: String): ApiResult<TotpAuthenticationResponse> {
-        return try {
-            val response = api.authenticateTotp(TotpAuthenticationRequest(totp = totp))
-            if (response.isSuccessful) {
-                val body = response.body()
-                if (body == null) ApiResult.Error("Empty authentication response", response.code())
-                else {
-                    configStore.setJwtToken(body.accessToken)
-                    ApiResult.Success(body)
-                }
-            } else {
-                val message = response.errorBody()?.string()?.let { body ->
-                    runCatching { json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content }.getOrNull()
-                }.orEmpty()
-                ApiResult.Error(message.ifBlank { "Device authentication failed (${response.code()})" }, response.code())
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.localizedMessage ?: "Network error during device authentication", cause = e)
-        }
-    }
 
     open fun clearAuth() {
         configStore.clearAuth()
@@ -113,6 +92,10 @@ open class TradingRepository(
 
     open suspend fun getSensexSpot(): ApiResult<SensexSpotDto> = safeApiCall {
         api.getSensexSpot()
+    }
+
+    open suspend fun getIndexSpot(symbol: String): ApiResult<SensexSpotDto> = safeApiCall {
+        api.getIndexSpot(symbol)
     }
 
     open suspend fun getLoginUrl(): ApiResult<String> = safeApiCall {

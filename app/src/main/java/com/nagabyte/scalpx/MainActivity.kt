@@ -6,6 +6,7 @@ import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -24,7 +25,6 @@ import androidx.lifecycle.lifecycleScope
 import com.nagabyte.scalpx.core.enableSecureScreen
 import com.nagabyte.scalpx.ui.auth.BiometricGate
 import com.nagabyte.scalpx.ui.auth.BrokerLoginHelper
-import com.nagabyte.scalpx.ui.auth.SettingsSetupScreen
 import com.nagabyte.scalpx.ui.screens.ScalperCockpitScreen
 import com.nagabyte.scalpx.ui.scalper.ScalperIntent
 import com.nagabyte.scalpx.ui.scalper.ScalperUiEffect
@@ -49,6 +49,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         enableSecureScreen()
 
         // Handle initial deep link if app launched via URI
@@ -71,14 +72,10 @@ class MainActivity : FragmentActivity() {
                             }
                         )
                     }
-                    uiState.isSettingsOpen || !app.tradingRepository.isUserAuthenticated() -> {
-                        SettingsSetupScreen(
-                            repository = app.tradingRepository,
-                            onSaved = {
-                                viewModel.handleIntent(ScalperIntent.OpenSettings(false))
-                                viewModel.refreshHealth()
-                                viewModel.reconnectFeed()
-                            }
+                    uiState.isSettingsOpen -> {
+                        ScalperCockpitScreen(
+                            state = uiState,
+                            onIntent = viewModel::handleIntent
                         )
                     }
                     else -> {

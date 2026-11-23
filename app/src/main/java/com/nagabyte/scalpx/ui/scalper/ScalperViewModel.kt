@@ -637,9 +637,6 @@ class ScalperViewModel(
                             accountStateUncertain = s.accountStateUncertain
                         )
                     }
-                    if (s.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
-                        openDailyOtpSheet()
-                    }
                 }
                 is ApiResult.Error -> {
                     // Fallback to checkHealth() for backwards compatibility with health probe
@@ -657,9 +654,6 @@ class ScalperViewModel(
                                     sessionValid = h.sessionValid,
                                     sessionValidity = h.sessionValidity
                                 )
-                            }
-                            if (h.sessionValidity == "INVALID" && !_uiState.value.dailyOtpSheet.isVisible) {
-                                openDailyOtpSheet()
                             }
                         }
                         is ApiResult.Error -> {
@@ -731,9 +725,9 @@ class ScalperViewModel(
     }
 
     fun refreshSensexSpot() {
-        if (_uiState.value.selectedIndex != "SENSEX" || !repository.isUserAuthenticated()) return
+        val symbol = _uiState.value.selectedIndex
         viewModelScope.launch {
-            when (val result = repository.getSensexSpot()) {
+            when (val result = repository.getIndexSpot(symbol)) {
                 is ApiResult.Success -> {
                     val spot = result.data
                     val readyLtp = spot.spotLtpPaise?.takeIf {

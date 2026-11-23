@@ -134,7 +134,7 @@ class TradingWsClientTest {
     }
 
     @Test
-    fun `wsClient connects using headers only without query parameters`() = runBlocking {
+    fun `wsClient connects without application device headers or query parameters`() = runBlocking {
         mockWebServer.enqueue(
             MockResponse()
                 .withWebSocketUpgrade(object : WebSocketListener() {})
@@ -144,7 +144,7 @@ class TradingWsClientTest {
 
         val recordedRequest = mockWebServer.takeRequest()
         assertEquals("/ws", recordedRequest.path)
-        assertEquals("Bearer test-ws-token", recordedRequest.getHeader("Authorization"))
+        assertEquals(null, recordedRequest.getHeader("Authorization"))
         assertEquals(null, recordedRequest.getHeader("X-Device-Id"))
     }
 

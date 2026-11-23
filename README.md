@@ -6,31 +6,20 @@
 ### Core Architectural Invariants
 1. **Server-Authoritative Thin Client:** Zero business logic, risk calculations, or ratcheting SL mathematics run on the phone. The phone strictly renders state snapshots received via WebSocket/REST and dispatches user commands with unique UUID idempotency tokens.
 2. **Zero Broker Secrets on Phone:** Broker credentials (`api_key`, `api_secret`, Flattrade passwords, session tokens) NEVER touch the Android client.
-3. **TOTP-only Authentication:** The app displays a six-digit TOTP field and sends only the code to the backend.
+3. **Direct Startup:** The app opens the trading cockpit without application TOTP or device authentication.
 
 ---
 
-## Authentication Flow & Error Handling
+## Startup and broker OAuth
 
-```
-[ Android App ]                                     [ scalpX Backend ]
-      |                                                     |
-      |-- 1. POST /api/auth/daily-login ------------------>|
-      |      Body: { "totp": "123456" }                    |
-      |<-- 2. HTTP 200 OK with JWT (or Error Code) ---------|
-      |                                                     |
-      |-- 3. Stores JWT in Keystore Encrypted Storage       |
-      |-- 4. Dispatches /api/app/config & connects /ws      |
-```
+Android opens the trading cockpit directly. It does not require TOTP or an application session.
 
-### Error Code Mappings
+Flattrade authentication is a separate browser flow:
 
-| Backend Error Code / HTTP Status | Displayed User Message |
-|---|---|
-| `401` / `INVALID_TOTP` | Invalid TOTP code. Try again. |
-| `401` / `TOTP_REPLAY` | This TOTP code has already been used. Wait for the next code. |
-| `503` / `TOTP_NOT_CONFIGURED` | Authentication is temporarily unavailable. Contact the administrator. |
-| Network / Connection Failure | Unable to connect to the server. Check your connection. |
+1. Android calls `GET /api/auth/login-url`.
+2. The official Flattrade login opens in Chrome Custom Tabs.
+3. The backend handles the callback and broker session.
+4. Android receives only backend status and live market/position updates.
 
 ---
 

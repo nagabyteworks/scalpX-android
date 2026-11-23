@@ -313,16 +313,15 @@ class ScalperViewModelTest {
     }
 
     @Test
-    fun `stored but invalid session opens authentication sheet`() = runTest(testDispatcher) {
+    fun `invalid broker session does not open an app authentication sheet`() = runTest(testDispatcher) {
         fakeRepo.healthBrokerConnected = false
         fakeRepo.healthSessionValidity = "INVALID"
         val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
         testScheduler.advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.sessionTokenPresent)
         assertFalse(viewModel.uiState.value.sessionValid)
         assertEquals("INVALID", viewModel.uiState.value.sessionValidity)
-        assertTrue(viewModel.uiState.value.dailyOtpSheet.isVisible)
+        assertFalse(viewModel.uiState.value.dailyOtpSheet.isVisible)
     }
 
     private class FakeTradingRepository : TradingRepository(
@@ -502,11 +501,11 @@ class ScalperViewModelTest {
             }
 
             private fun createDummyApi(): TradingApi = object : TradingApi {
-                override suspend fun authenticateTotp(request: TotpAuthenticationRequest) = throw NotImplementedError()
                 override suspend fun getHealth() = throw NotImplementedError()
                 override suspend fun getAppConfig() = throw NotImplementedError()
                 override suspend fun getAuthStatus() = throw NotImplementedError()
                 override suspend fun getSensexSpot() = throw NotImplementedError()
+                override suspend fun getIndexSpot(symbol: String) = throw NotImplementedError()
                 override suspend fun getLoginUrl() = throw NotImplementedError()
                 override suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int) = throw NotImplementedError()
                 override suspend fun placeOneClickOrder(request: OneClickOrderRequest) = throw NotImplementedError()
