@@ -213,7 +213,9 @@ open class TradingRepository(
         } catch (e: HttpException) {
             val errorBody = e.response()?.errorBody()?.string()
             ApiResult.Error(
-                message = errorBody ?: e.message() ?: "HTTP ${e.code()}",
+                message = errorBody?.let(::parseApiError)
+                    ?: e.message()
+                    ?: "HTTP ${e.code()}",
                 statusCode = e.code(),
                 cause = e
             )
@@ -227,6 +229,18 @@ open class TradingRepository(
                 message = e.message ?: "Unexpected error occurred",
                 cause = e
             )
+        }
+
+    }
+
+    private fun parseApiError(body: String): String {
+        return try {
+            val decoded = json.decodeFromString<ApiErrorResponse>(body)
+            decoded.message.takeIf { it.isNotBlank() }
+                ?: decoded.error.takeIf { it.isNotBlank() }
+                ?: "Market-data request failed"
+        } catch (_: Exception) {
+            "Market-data request failed"
         }
     }
 

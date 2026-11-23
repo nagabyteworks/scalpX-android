@@ -9,14 +9,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.nagabyte.scalpx.core.MoneyFormatter
 import com.nagabyte.scalpx.ui.auth.DailyOtpSheet
 import com.nagabyte.scalpx.ui.components.*
 import com.nagabyte.scalpx.ui.scalper.*
 import com.nagabyte.scalpx.ui.theme.LocalScalperTheme
 import com.nagabyte.scalpx.ui.theme.ScalperTheme
 import com.nagabyte.scalpx.ui.theme.getScalperColors
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.delay
 
 /**
@@ -67,37 +65,18 @@ fun ScalperCockpitScreen(
             state.totalUnrealizedPnlPaise + state.totalRealizedPnlPaise
         }
 
-        var localConfirmation by remember { mutableStateOf<PendingOrderConfirmation?>(null) }
-
-        // Local helper for buy/sell actions with safety check
-        fun executeOrConfirm(
+        fun executeOrder(
             side: String,
             token: String,
             symbol: String,
             ltpPaise: Long,
-            lotSize: Int
+            lotSize: Int,
+            marketDataTimestamp: Long?
         ) {
-            if (state.oneClickEnabled) {
-                if (side == "BUY") {
-                    onIntent(ScalperIntent.OneClickBuy(token, symbol, ltpPaise, lotSize))
-                } else {
-                    onIntent(ScalperIntent.OneClickSell(token, symbol, ltpPaise, lotSize))
-                }
+            if (side == "BUY") {
+                onIntent(ScalperIntent.OneClickBuy(token, symbol, ltpPaise, marketDataTimestamp, lotSize))
             } else {
-                val actionText = if (side == "BUY") "Buy" else "Sell"
-                val lotsText = "${state.selectedLots} Lots (${state.selectedLots * lotSize})"
-                val priceText = if (ltpPaise > 0) " at ~₹${MoneyFormatter.formatPaise(ltpPaise)}" else ""
-                localConfirmation = PendingOrderConfirmation(
-                    title = "Confirm $actionText Order",
-                    message = "Are you sure you want to $actionText $lotsText $symbol$priceText?",
-                    onConfirm = {
-                        if (side == "BUY") {
-                            onIntent(ScalperIntent.OneClickBuy(token, symbol, ltpPaise, lotSize))
-                        } else {
-                            onIntent(ScalperIntent.OneClickSell(token, symbol, ltpPaise, lotSize))
-                        }
-                    }
-                )
+                onIntent(ScalperIntent.OneClickSell(token, symbol, ltpPaise, marketDataTimestamp, lotSize))
             }
         }
 
@@ -138,7 +117,7 @@ fun ScalperCockpitScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    // ZONE 2: 2-Row Parameter Selector Grid + Safety Toggle & Ratchet SL Pill
+                    // ZONE 2: Parameter Selector Grid + Ratchet SL Pill
                     Zone2ParameterGrid(
                         selectedIndex = state.selectedIndex,
                         selectedExpiry = state.selectedExpiry,
@@ -149,7 +128,6 @@ fun ScalperCockpitScreen(
                         selectedLots = state.selectedLots,
                         lotSize = state.lotSize,
                         ladderDraft = state.ladderDraft,
-                        oneClickEnabled = state.oneClickEnabled,
                         isCollapsed = state.isZone2Collapsed,
                         onSelectIndex = { onIntent(ScalperIntent.SelectIndex(it)) },
                         onSelectExpiry = { onIntent(ScalperIntent.SelectExpiry(it)) },
@@ -157,7 +135,6 @@ fun ScalperCockpitScreen(
                         onStepCallStrike = { delta -> onIntent(ScalperIntent.StepStrike(isCall = true, deltaSteps = delta)) },
                         onStepPutStrike = { delta -> onIntent(ScalperIntent.StepStrike(isCall = false, deltaSteps = delta)) },
                         onStepLots = { delta -> onIntent(ScalperIntent.StepLots(delta)) },
-                        onToggleOneClick = { onIntent(ScalperIntent.ToggleOneClick(it)) },
                         onToggleCollapse = { onIntent(ScalperIntent.ToggleZone2Collapse(it)) },
                         onOpenRatchetConfig = { onIntent(ScalperIntent.OpenRatchetConfig(true)) }
                     )
@@ -168,6 +145,7 @@ fun ScalperCockpitScreen(
                     Zone3SpotPanicHub(
                         selectedIndex = state.selectedIndex,
                         spotLtpPaise = state.spotLtpPaise,
+                        spotStatus = state.spotStatus,
                         spotChangePts = state.spotChangePts,
                         spotChangePercent = state.spotChangePercent,
                         lastServerMessage = state.lastServerMessage,
@@ -185,16 +163,16 @@ fun ScalperCockpitScreen(
                         lotSize = state.lotSize,
                         inFlightCommands = state.inFlightCommands,
                         onBuyCall = { token, symbol, ltp ->
-                            executeOrConfirm("BUY", token, symbol, ltp, state.lotSize)
+                            executeOrder("BUY", token, symbol, ltp, callStrikeUi?.ceLotSize ?: state.lotSize, callStrikeUi?.ceTimestamp)
                         },
                         onSellCall = { token, symbol, ltp ->
-                            executeOrConfirm("SELL", token, symbol, ltp, state.lotSize)
+                            executeOrder("SELL", token, symbol, ltp, callStrikeUi?.ceLotSize ?: state.lotSize, callStrikeUi?.ceTimestamp)
                         },
                         onBuyPut = { token, symbol, ltp ->
-                            executeOrConfirm("BUY", token, symbol, ltp, state.lotSize)
+                            executeOrder("BUY", token, symbol, ltp, putStrikeUi?.peLotSize ?: state.lotSize, putStrikeUi?.peTimestamp)
                         },
                         onSellPut = { token, symbol, ltp ->
-                            executeOrConfirm("SELL", token, symbol, ltp, state.lotSize)
+                            executeOrder("SELL", token, symbol, ltp, putStrikeUi?.peLotSize ?: state.lotSize, putStrikeUi?.peTimestamp)
                         }
                     )
 
@@ -250,18 +228,7 @@ fun ScalperCockpitScreen(
         // ==========================================
         // DIALOGS & BOTTOM SHEETS
         // ==========================================
-        // 1. One-Click Order Confirmation Dialog
-        (localConfirmation ?: state.pendingConfirmation)?.let { confirmation ->
-            OrderConfirmationDialog(
-                confirmation = confirmation,
-                onDismiss = {
-                    localConfirmation = null
-                    onIntent(ScalperIntent.DismissConfirmation)
-                }
-            )
-        }
-
-        // 2. Ratchet Configuration Bottom Sheet
+        // 1. Ratchet Configuration Bottom Sheet
         if (state.isRatchetConfigOpen) {
             RatchetConfigBottomSheet(
                 draft = state.ladderDraft,
@@ -270,7 +237,7 @@ fun ScalperCockpitScreen(
             )
         }
 
-        // 3. Flattrade browser authorization sheet
+        // 2. Flattrade browser authorization sheet
         if (state.dailyOtpSheet.isVisible) {
             DailyOtpSheet(
                 sheetState = state.dailyOtpSheet,
@@ -279,7 +246,7 @@ fun ScalperCockpitScreen(
             )
         }
 
-        // 4. Edit Active Ladder Bottom Sheet
+        // 3. Edit Active Ladder Bottom Sheet
         state.editingPosition?.let { pos ->
             EditLadderBottomSheet(
                 position = pos,
@@ -304,108 +271,7 @@ fun ScalperCockpitScreen(
 // PREVIEWS
 // ==========================================
 private fun sampleState(isDark: Boolean = false, isTable: Boolean = false): ScalperUiState {
-    val samplePositions = persistentListOf(
-        ActivePositionUi(
-            token = "42300CE",
-            symbol = "BANKNIFTY22D2242300CE",
-            quantity = 0,
-            entryPricePaise = 30900L,
-            currentLtpPaise = 28680L,
-            unrealizedPnlPaise = 0L,
-            realizedPnlPaise = -140250L,
-            exchangeSlTriggerPaise = 0L,
-            localNextMilestonePaise = 32000L,
-            stepSizePaise = 500L,
-            product = "MARGIN",
-            side = "-",
-            buyQty = 1275,
-            buyPricePaise = 31000L,
-            sellQty = 1275,
-            sellPricePaise = 30900L
-        ),
-        ActivePositionUi(
-            token = "43000PE",
-            symbol = "BANKNIFTY22D2243000PE",
-            quantity = 0,
-            entryPricePaise = 34400L,
-            currentLtpPaise = 49265L,
-            unrealizedPnlPaise = 0L,
-            realizedPnlPaise = 830625L,
-            exchangeSlTriggerPaise = 0L,
-            localNextMilestonePaise = 51000L,
-            stepSizePaise = 500L,
-            product = "MARGIN",
-            side = "-",
-            buyQty = 375,
-            buyPricePaise = 32200L,
-            sellQty = 375,
-            sellPricePaise = 34400L
-        ),
-        ActivePositionUi(
-            token = "43100PE",
-            symbol = "BANKNIFTY22D2243100PE",
-            quantity = 0,
-            entryPricePaise = 33200L,
-            currentLtpPaise = 58555L,
-            unrealizedPnlPaise = 0L,
-            realizedPnlPaise = 1090475L,
-            exchangeSlTriggerPaise = 0L,
-            localNextMilestonePaise = 60000L,
-            stepSizePaise = 500L,
-            product = "MARGIN",
-            side = "-",
-            buyQty = 1325,
-            buyPricePaise = 32400L,
-            sellQty = 1325,
-            sellPricePaise = 33200L
-        )
-    )
-
-    val sampleStrikes = persistentListOf(
-        OptionStrikeUi(
-            strikePrice = 42300.0,
-            ceToken = "42300CE",
-            ceSymbol = "BANKNIFTY22122242300CE",
-            ceLtpPaise = 28680L,
-            peToken = "42300PE",
-            peSymbol = "BANKNIFTY22122242300PE",
-            peLtpPaise = 18050L
-        ),
-        OptionStrikeUi(
-            strikePrice = 42700.0,
-            ceToken = "42700CE",
-            ceSymbol = "BANKNIFTY22122242700CE",
-            ceLtpPaise = 14500L,
-            peToken = "42700PE",
-            peSymbol = "BANKNIFTY22122242700PE",
-            peLtpPaise = 23490L
-        )
-    )
-
-    return ScalperUiState(
-        brokerConnected = true,
-        wsFeedHealthy = true,
-        pingMs = 24L,
-        userId = "FT01234",
-        selectedIndex = "BANKNIFTY",
-        selectedExpiry = "22-Dec-2022",
-        selectedCallStrike = 42300.0,
-        selectedPutStrike = 42700.0,
-        selectedLots = 1,
-        lotSize = 15,
-        product = "MIS",
-        spotLtpPaise = 4252080L,
-        spotChangePts = -97.15,
-        spotChangePercent = -0.23,
-        oneClickEnabled = true,
-        isDarkTheme = isDark,
-        isTableView = isTable,
-        lastServerMessage = "-",
-        totalRealizedPnlPaise = 1780850L,
-        totalUnrealizedPnlPaise = 0L,
-        strikes = sampleStrikes,
-        positions = samplePositions
-    )
+    return ScalperUiState(isDarkTheme = isDark, isTableView = isTable)
 }
 
 @Preview(name = "Small Phone Portrait (360x780)", widthDp = 360, heightDp = 780, showBackground = true)

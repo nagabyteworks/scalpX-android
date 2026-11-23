@@ -5,12 +5,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nagabyte.scalpx.core.MoneyFormatter
 import com.nagabyte.scalpx.data.remote.WsConnectionState
+import com.nagabyte.scalpx.data.remote.dto.MarketDataSnapshotDto
 import com.nagabyte.scalpx.data.repository.ApiResult
 import com.nagabyte.scalpx.data.repository.TradingRepository
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 
@@ -31,12 +34,16 @@ class ScalperViewModel(
     val uiEffect: SharedFlow<ScalperUiEffect> = _uiEffect.asSharedFlow()
 
     private val lastTapTimestamps = ConcurrentHashMap<String, Long>()
+    private var optionChainRefreshJob: Job? = null
+    private var spotRefreshJob: Job? = null
+    private var lastOptionChainAttemptAt = 0L
 
     init {
         observeRepositoryStreams()
         refreshHealth()
         loadPresetsFromConfig()
-        refreshOptionChain()
+        repository.connectWebSocket()
+        refreshSensexSpot()
     }
 
     private fun loadPresetsFromConfig() {
@@ -63,6 +70,7 @@ class ScalperViewModel(
                     ActivePositionUi(
                         token = pos.token,
                         symbol = pos.symbol,
+                        side = pos.side,
                         quantity = pos.quantity,
                         entryPricePaise = pos.entryPricePaise,
                         currentLtpPaise = pos.currentLtpPaise,
@@ -85,6 +93,7 @@ class ScalperViewModel(
                         totalUnrealizedPnlPaise = totalUnrealized
                     )
                 }
+                snapshot.marketData?.let(::applyMarketDataSnapshot)
             }
         }
 
@@ -154,10 +163,73 @@ class ScalperViewModel(
         }
     }
 
+    private fun applyMarketDataSnapshot(market: MarketDataSnapshotDto) {
+        _uiState.update { current ->
+            if (market.indexSymbol != current.selectedIndex) return@update current
+
+            val updatedStrikes = market.strikes.map { strike ->
+                OptionStrikeUi(
+                    strikePrice = strike.strikePrice,
+                    ceToken = strike.ceToken,
+                    ceSymbol = strike.ceSymbol,
+                    ceLotSize = strike.ceLotSize,
+                    ceLtpPaise = strike.ceLtpPaise,
+                    ceTimestamp = strike.ceTimestamp,
+                    peToken = strike.peToken,
+                    peSymbol = strike.peSymbol,
+                    peLotSize = strike.peLotSize,
+                    peLtpPaise = strike.peLtpPaise,
+                    peTimestamp = strike.peTimestamp
+                )
+            }.toPersistentList()
+            val selectedCall = current.selectedCallStrike?.let { selected ->
+                updatedStrikes.find { it.strikePrice == selected }
+            } ?: updatedStrikes.find { it.strikePrice == market.atmStrike }
+            val selectedPut = current.selectedPutStrike?.let { selected ->
+                updatedStrikes.find { it.strikePrice == selected }
+            } ?: updatedStrikes.find { it.strikePrice == market.atmStrike }
+            val freshSpot = market.spotLtpPaise != null &&
+                market.spotTimestamp != null &&
+                System.currentTimeMillis() - market.spotTimestamp in 0L..3_000L &&
+                market.feedStatus == "CONNECTED"
+            val feedError = when (market.feedStatus) {
+                "STALE" -> "Flattrade market-data ticks are stale."
+                "DISCONNECTED", "RECONNECTING" -> "Flattrade market-data WebSocket is ${market.feedStatus.lowercase()}."
+                "WAITING_FOR_TICK" -> "Waiting for fresh Flattrade spot and option ticks."
+                else -> null
+            }
+
+            current.copy(
+                selectedExchange = if (market.indexSymbol == "SENSEX") "BFO" else "NFO",
+                selectedExpiry = market.selectedExpiry,
+                strikes = if (updatedStrikes.isNotEmpty()) updatedStrikes else current.strikes,
+                selectedStrike = current.selectedStrike ?: market.atmStrike,
+                selectedCallStrike = selectedCall?.strikePrice ?: current.selectedCallStrike ?: market.atmStrike,
+                selectedPutStrike = selectedPut?.strikePrice ?: current.selectedPutStrike ?: market.atmStrike,
+                lotSize = selectedCall?.ceLotSize ?: selectedPut?.peLotSize ?: current.lotSize,
+                spotLtpPaise = if (freshSpot) market.spotLtpPaise!! else 0L,
+                spotStatus = if (freshSpot) "READY" else market.feedStatus,
+                marketDataTimestamp = market.marketDataTimestamp,
+                feedConnectionStatus = market.feedStatus,
+                marketDataError = feedError
+            )
+        }
+    }
+
     fun handleIntent(intent: ScalperIntent) {
         when (intent) {
             is ScalperIntent.SelectIndex -> selectIndex(intent.index)
-            is ScalperIntent.SelectExpiry -> _uiState.update { it.copy(selectedExpiry = intent.expiry) }
+            is ScalperIntent.SelectExpiry -> {
+                _uiState.update {
+                    it.copy(
+                        selectedExpiry = intent.expiry,
+                        selectedStrike = null,
+                        selectedCallStrike = null,
+                        selectedPutStrike = null
+                    )
+                }
+                refreshOptionChain()
+            }
             is ScalperIntent.SelectStrike -> _uiState.update { it.copy(selectedStrike = intent.strike, selectedCallStrike = intent.strike, selectedPutStrike = intent.strike) }
             is ScalperIntent.SelectCallStrike -> _uiState.update { it.copy(selectedCallStrike = intent.strike) }
             is ScalperIntent.SelectPutStrike -> _uiState.update { it.copy(selectedPutStrike = intent.strike) }
@@ -167,14 +239,11 @@ class ScalperViewModel(
             is ScalperIntent.StepLots -> stepLots(intent.delta)
             is ScalperIntent.SelectProduct -> _uiState.update { it.copy(product = intent.product) }
 
-            is ScalperIntent.ToggleOneClick -> _uiState.update { it.copy(oneClickEnabled = intent.enabled) }
             is ScalperIntent.ToggleZone2Collapse -> _uiState.update { it.copy(isZone2Collapsed = intent.collapsed) }
             is ScalperIntent.SelectBookTab -> _uiState.update { it.copy(activeTab = intent.tab) }
             is ScalperIntent.ToggleTableView -> _uiState.update { it.copy(isTableView = intent.isTable) }
             is ScalperIntent.ToggleTheme -> _uiState.update { it.copy(isDarkTheme = intent.isDark) }
             is ScalperIntent.OpenRatchetConfig -> _uiState.update { it.copy(isRatchetConfigOpen = intent.open) }
-            is ScalperIntent.DismissConfirmation -> _uiState.update { it.copy(pendingConfirmation = null) }
-
             is ScalperIntent.UpdateLadderDraft -> _uiState.update { it.copy(ladderDraft = intent.draft) }
 
             is ScalperIntent.OneClickBuy -> handleOneClickBuy(intent)
@@ -253,6 +322,13 @@ class ScalperViewModel(
             releaseActionLock(actionKey)
             return
         }
+        if (!hasFreshSelectedTick(intent.marketDataTimestamp, intent.ltpPaise)) {
+            viewModelScope.launch {
+                _uiEffect.emit(ScalperUiEffect.ShowToast("Order blocked: Selected option has no fresh Flattrade tick"))
+            }
+            releaseActionLock(actionKey)
+            return
+        }
 
         viewModelScope.launch {
             try {
@@ -268,14 +344,15 @@ class ScalperViewModel(
                 val result = repository.executeOneClickOrder(
                     token = intent.token,
                     symbol = intent.symbol,
-                    exchange = "NFO",
+                    exchange = _uiState.value.selectedExchange,
                     lots = _uiState.value.selectedLots,
                     lotSize = intent.lotSize,
                     stepSizePaise = stepSizePaise,
                     breakoutBufferPaise = breakoutBufferPaise,
                     slippageBufferPaise = slippageBufferPaise,
                     firstMilestonePaise = firstMilestonePaise,
-                    initialSlPoints = draft.initialSlPts
+                    initialSlPoints = draft.initialSlPts,
+                    product = productCode
                 )
 
                 when (result) {
@@ -309,10 +386,23 @@ class ScalperViewModel(
         val actionKey = "SELL_${intent.token}"
         if (!acquireActionLock(actionKey)) return
 
+        val openPosition = _uiState.value.positions.find { it.token == intent.token && it.quantity > 0 }
+        val blockedReason = if (openPosition == null) entryBlockedReason(intent.marketDataTimestamp, intent.ltpPaise) else null
+        if (blockedReason != null) {
+            viewModelScope.launch { _uiEffect.emit(ScalperUiEffect.ShowToast(blockedReason)) }
+            releaseActionLock(actionKey)
+            return
+        }
+        if (openPosition != null && !_uiState.value.brokerConnected) {
+            viewModelScope.launch { _uiEffect.emit(ScalperUiEffect.ShowToast("Order blocked: Broker is disconnected")) }
+            releaseActionLock(actionKey)
+            return
+        }
+
         viewModelScope.launch {
             try {
                 // If user holds an open position for this token, exit position
-                val openPos = _uiState.value.positions.find { it.token == intent.token && it.quantity > 0 }
+                val openPos = openPosition
                 if (openPos != null) {
                     when (val result = repository.exitPosition(intent.token)) {
                         is ApiResult.Success -> {
@@ -341,16 +431,24 @@ class ScalperViewModel(
                     val breakoutBufferPaise = max(5L, MoneyFormatter.roundDownToTick((draft.breakoutBufferPts * 100).toLong(), 5L))
                     val slippageBufferPaise = max(5L, MoneyFormatter.roundDownToTick((draft.slippageBufferPts * 100).toLong(), 5L))
                     val productCode = if (_uiState.value.product.equals("NRML", ignoreCase = true)) "M" else "I"
+                    val targetPaise = MoneyFormatter.roundDownToTick((draft.firstTargetPts * 100).toLong(), 5L)
+                    val firstMilestonePaise = MoneyFormatter.roundDownToTick(intent.ltpPaise - targetPaise, 5L)
+                    if (firstMilestonePaise <= 0L) {
+                        _uiEffect.emit(ScalperUiEffect.ShowToast("Sell blocked: Target is below the valid option price range"))
+                        return@launch
+                    }
 
                     val result = repository.executeOneClickOrder(
                         token = intent.token,
                         symbol = intent.symbol,
-                        exchange = "NFO",
+                        exchange = _uiState.value.selectedExchange,
                         lots = _uiState.value.selectedLots,
                         lotSize = intent.lotSize,
                         stepSizePaise = stepSizePaise,
                         breakoutBufferPaise = breakoutBufferPaise,
                         slippageBufferPaise = slippageBufferPaise,
+                        firstMilestonePaise = firstMilestonePaise,
+                        initialSlPoints = draft.initialSlPts,
                         side = "SELL",
                         product = productCode
                     )
@@ -595,7 +693,7 @@ class ScalperViewModel(
             _uiEffect.tryEmit(ScalperUiEffect.ShowToast("Flattrade Authenticated Successfully!"))
             refreshHealth()
             reconnectFeed()
-            refreshOptionChain()
+            refreshSensexSpot()
         } else if (path.endsWith("/error")) {
             val errorMsg = uri.getQueryParameter("message") ?: "OAuth error"
             _uiEffect.tryEmit(ScalperUiEffect.ShowToast("Authentication Failed: $errorMsg"))
@@ -606,18 +704,22 @@ class ScalperViewModel(
         _uiState.update {
             it.copy(
                 selectedIndex = index,
+                selectedExchange = if (index == "SENSEX") "BFO" else "NFO",
                 // Spot and contract metadata must come from broker market/instrument data.
                 // Clear the prior index value so an old spot cannot select the wrong ATM.
                 spotLtpPaise = 0L,
-                spotStatus = if (index == "SENSEX") "WAITING_FOR_TICK" else "UNAVAILABLE",
+                spotStatus = "WAITING_FOR_TICK",
+                marketDataTimestamp = null,
+                marketDataError = null,
                 strikes = persistentListOf(),
+                availableExpiries = persistentListOf(),
                 selectedExpiry = "",
                 selectedStrike = null,
                 selectedCallStrike = null,
                 selectedPutStrike = null
             )
         }
-        refreshOptionChain()
+        refreshSensexSpot()
     }
 
     fun refreshHealth() {
@@ -678,46 +780,77 @@ class ScalperViewModel(
         repository.connectWebSocket()
     }
 
-    fun refreshOptionChain() {
-        viewModelScope.launch {
-            val symbol = _uiState.value.selectedIndex
-            val expiry = _uiState.value.selectedExpiry
+    fun refreshOptionChain(force: Boolean = true) {
+        val now = SystemClock.elapsedRealtime()
+        if (!force && lastOptionChainAttemptAt > 0L && now - lastOptionChainAttemptAt < 5_000L) return
+        if (!force && optionChainRefreshJob?.isActive == true) return
+        lastOptionChainAttemptAt = now
+        optionChainRefreshJob?.cancel()
+        optionChainRefreshJob = viewModelScope.launch {
+            val current = _uiState.value
+            val symbol = current.selectedIndex
+            val expiry = current.selectedExpiry
             when (val result = repository.getOptionChain(symbol, expiry)) {
                 is ApiResult.Success -> {
-                    val strikesList = result.data.strikes.map { s ->
+                    val chain = result.data
+                    if (_uiState.value.selectedIndex != symbol ||
+                        (_uiState.value.selectedExpiry.isNotBlank() && _uiState.value.selectedExpiry != expiry)) {
+                        return@launch
+                    }
+                    val strikesList = chain.strikes.map { strike ->
                         OptionStrikeUi(
-                            strikePrice = s.strikePrice,
-                            ceToken = s.ceToken,
-                            ceSymbol = s.ceSymbol,
-                            ceLtpPaise = s.ceLtpPaise,
-                            peToken = s.peToken,
-                            peSymbol = s.peSymbol,
-                            peLtpPaise = s.peLtpPaise
+                            strikePrice = strike.strikePrice,
+                            ceToken = strike.ceToken,
+                            ceSymbol = strike.ceSymbol,
+                            ceLotSize = strike.ceLotSize,
+                            ceLtpPaise = strike.ceLtpPaise,
+                            ceTimestamp = strike.ceTimestamp,
+                            peToken = strike.peToken,
+                            peSymbol = strike.peSymbol,
+                            peLotSize = strike.peLotSize,
+                            peLtpPaise = strike.peLtpPaise,
+                            peTimestamp = strike.peTimestamp
                         )
                     }.toPersistentList()
 
-                    // ATM is selected only when the backend validated it against fresh spot
-                    // data and complete CE/PE contracts. Never infer it from stale UI state.
-                    val atmStrike = result.data.atmStrike?.takeIf { strike ->
+                    val atmStrike = chain.atmStrike?.takeIf { strike ->
                         strikesList.any { it.strikePrice == strike && !it.ceToken.isNullOrBlank() && !it.peToken.isNullOrBlank() }
                     }
-                    val defaultStrike = _uiState.value.selectedStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected } } ?: atmStrike
-                    val callStrike = _uiState.value.selectedCallStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected && !it.ceToken.isNullOrBlank() } } ?: atmStrike
-                    val putStrike = _uiState.value.selectedPutStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected && !it.peToken.isNullOrBlank() } } ?: atmStrike
+                    val latest = _uiState.value
+                    val defaultStrike = latest.selectedStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected } } ?: atmStrike
+                    val callStrike = latest.selectedCallStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected && !it.ceToken.isNullOrBlank() } } ?: atmStrike
+                    val putStrike = latest.selectedPutStrike?.takeIf { selected -> strikesList.any { it.strikePrice == selected && !it.peToken.isNullOrBlank() } } ?: atmStrike
+                    val callLotSize = strikesList.find { it.strikePrice == callStrike }?.ceLotSize
+                    val putLotSize = strikesList.find { it.strikePrice == putStrike }?.peLotSize
 
                     _uiState.update {
                         it.copy(
-                            selectedExpiry = result.data.expiry,
+                            selectedExchange = chain.exchange,
+                            selectedExpiry = chain.expiry,
+                            availableExpiries = chain.expiries.toPersistentList(),
                             strikes = strikesList,
                             selectedStrike = defaultStrike,
                             selectedCallStrike = callStrike,
-                            selectedPutStrike = putStrike
+                            selectedPutStrike = putStrike,
+                            lotSize = callLotSize ?: putLotSize ?: 0,
+                            marketDataError = null,
+                            lastServerMessage = "-",
+                            lastServerMessageType = MessageType.INFO
                         )
                     }
                 }
                 is ApiResult.Error -> {
+                    if (_uiState.value.selectedIndex != symbol) return@launch
                     _uiState.update {
-                        it.copy(strikes = persistentListOf(), selectedStrike = null, selectedCallStrike = null, selectedPutStrike = null)
+                        it.copy(
+                            strikes = persistentListOf(),
+                            selectedStrike = null,
+                            selectedCallStrike = null,
+                            selectedPutStrike = null,
+                            marketDataError = result.message,
+                            lastServerMessage = result.message,
+                            lastServerMessageType = MessageType.ERROR
+                        )
                     }
                 }
             }
@@ -726,23 +859,57 @@ class ScalperViewModel(
 
     fun refreshSensexSpot() {
         val symbol = _uiState.value.selectedIndex
-        viewModelScope.launch {
-            when (val result = repository.getIndexSpot(symbol)) {
-                is ApiResult.Success -> {
-                    val spot = result.data
-                    val readyLtp = spot.spotLtpPaise?.takeIf {
-                        spot.status == "READY" && spot.marketDataReady && it > 0L
-                    }
-                    _uiState.update {
-                        it.copy(
-                            spotLtpPaise = readyLtp ?: 0L,
-                            spotStatus = if (readyLtp != null) "READY" else spot.status
+        spotRefreshJob?.cancel()
+        spotRefreshJob = viewModelScope.launch {
+            while (_uiState.value.selectedIndex == symbol) {
+                var retry = false
+                when (val result = repository.getIndexSpot(symbol)) {
+                    is ApiResult.Success -> {
+                        val spot = result.data
+                        val readyLtp = spot.spotLtpPaise?.takeIf {
+                            spot.status == "READY" && spot.marketDataReady && it > 0L
+                        }
+                        _uiState.update {
+                            it.copy(
+                                spotLtpPaise = readyLtp ?: 0L,
+                                spotStatus = if (readyLtp != null) "READY" else spot.status,
+                                marketDataTimestamp = spot.timestamp,
+                                feedConnectionStatus = if (readyLtp != null) "CONNECTED" else spot.status,
+                                marketDataError = if (readyLtp == null) {
+                                    spot.error
+                                        ?: when (spot.status) {
+                                            "INSTRUMENT_UNAVAILABLE" -> "Flattrade index token resolution failed."
+                                            "STALE" -> "Flattrade spot tick is stale."
+                                            else -> "Waiting for a fresh Flattrade spot tick."
+                                        }
+                                } else null
+                            )
+                        }
+                        if (readyLtp != null && _uiState.value.strikes.isEmpty()) {
+                            refreshOptionChain(force = false)
+                        }
+                        retry = readyLtp == null && spot.status in setOf(
+                            "WAITING_FOR_TICK",
+                            "STALE",
+                            "RECONNECTING",
+                            "DISCONNECTED"
                         )
                     }
+                    is ApiResult.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                spotLtpPaise = 0L,
+                                spotStatus = "UNAVAILABLE",
+                                marketDataError = result.message,
+                                lastServerMessage = result.message,
+                                lastServerMessageType = MessageType.ERROR
+                            )
+                        }
+                        retry = true
+                    }
                 }
-                is ApiResult.Error -> _uiState.update {
-                    it.copy(spotLtpPaise = 0L, spotStatus = "UNAVAILABLE")
-                }
+                if (!retry) break
+                delay(SPOT_REFRESH_INTERVAL_MS)
             }
         }
     }
@@ -752,6 +919,24 @@ class ScalperViewModel(
      * 1. 500 ms tap cooldown per action key.
      * 2. Rejection if command is already in inFlightCommands.
      */
+    private fun entryBlockedReason(timestamp: Long?, ltpPaise: Long): String? {
+        val state = _uiState.value
+        if (!state.brokerConnected) return "Order blocked: Broker is disconnected"
+        if (!state.tradingEnabled) return "Order entry blocked: TRADING_ENABLED=false"
+        if (state.accountStateUncertain) return "Order blocked: Broker account state is uncertain"
+        if (state.feedConnectionStatus != "CONNECTED" || state.wsFeedStatus == "FEED_STALE") {
+            return "Order blocked: Flattrade market-data feed is not live"
+        }
+        val ageMs = timestamp?.let { System.currentTimeMillis() - it }
+        if (ltpPaise <= 0L || ageMs == null || ageMs !in 0L..3_000L) {
+            return "Order blocked: Selected option has no fresh Flattrade tick"
+        }
+        return null
+    }
+
+    private fun hasFreshSelectedTick(timestamp: Long?, ltpPaise: Long): Boolean =
+        entryBlockedReason(timestamp, ltpPaise) == null
+
     private fun acquireActionLock(actionKey: String): Boolean {
         val now = clock()
         val lastTap = lastTapTimestamps[actionKey] ?: 0L
@@ -774,5 +959,6 @@ class ScalperViewModel(
 
     companion object {
         const val TAP_COOLDOWN_MS = 500L
+        private const val SPOT_REFRESH_INTERVAL_MS = 1_000L
     }
 }

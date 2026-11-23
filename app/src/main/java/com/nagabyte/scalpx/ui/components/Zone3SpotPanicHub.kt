@@ -25,6 +25,7 @@ import com.nagabyte.scalpx.ui.theme.TradingTypography
 fun Zone3SpotPanicHub(
     selectedIndex: String,
     spotLtpPaise: Long,
+    spotStatus: String,
     spotChangePts: Double,
     spotChangePercent: Double,
     lastServerMessage: String,
@@ -65,7 +66,12 @@ fun Zone3SpotPanicHub(
                 val formattedLtp = if (liveSpotAvailable) MoneyFormatter.formatPaise(spotLtpPaise) else "--"
 
                 Text(
-                    text = if (liveSpotAvailable) "LTP: $formattedLtp" else "Waiting for live spot",
+                    text = if (liveSpotAvailable) "LTP: $formattedLtp" else when (spotStatus) {
+                        "STALE" -> "Spot data stale"
+                        "INSTRUMENT_UNAVAILABLE" -> "Spot token unavailable"
+                        "UNAVAILABLE" -> "Spot unavailable"
+                        else -> "Waiting for live spot"
+                    },
                     style = TradingTypography.TabularDigitsBold,
                     fontSize = 11.sp,
                     color = if (liveSpotAvailable) colors.textPrimary else colors.textSecondary,

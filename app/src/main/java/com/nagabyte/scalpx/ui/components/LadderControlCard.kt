@@ -309,16 +309,14 @@ fun LadderControlCard(
 fun LadderControlCardPreview() {
     LadderControlCard(
         position = ActivePositionUi(
-            token = "26000",
-            symbol = "NIFTY24DEC24500CE",
-            quantity = 50,
-            entryPricePaise = 10000L,
-            currentLtpPaise = 11250L,
-            unrealizedPnlPaise = 62500L,
-            exchangeSlTriggerPaise = 11000L,
-            exchangeSlLimitPaise = 10850L,
-            localNextMilestonePaise = 11500L,
-            stepSizePaise = 500L,
+            token = "",
+            symbol = "",
+            quantity = 0,
+            entryPricePaise = 0L,
+            currentLtpPaise = 0L,
+            unrealizedPnlPaise = 0L,
+            localNextMilestonePaise = 0L,
+            stepSizePaise = 0L,
             ratchetPaused = false
         ),
         inFlightCommands = emptySet()

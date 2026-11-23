@@ -198,8 +198,8 @@ private fun SlideToExitAllControl(
 @Composable
 fun PanicExitBarPreview() {
     PanicExitBar(
-        totalUnrealizedPnlPaise = 152000L,
-        totalRealizedPnlPaise = 45000L,
+        totalUnrealizedPnlPaise = 0L,
+        totalRealizedPnlPaise = 0L,
         inFlightCommands = emptySet()
     )
 }

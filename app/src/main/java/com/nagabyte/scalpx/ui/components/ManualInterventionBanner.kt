@@ -116,8 +116,8 @@ fun ManualInterventionBannerPreview() {
     ManualInterventionBanner(
         alert = CriticalAlertUi(
             type = "MANUAL_INTERVENTION_REQUIRED",
-            message = "Flattrade SL modification rejected: 400 Invalid Price. Manual square off required immediately!",
-            token = "26000"
+            message = "Manual intervention is required.",
+            token = null
         )
     )
 }

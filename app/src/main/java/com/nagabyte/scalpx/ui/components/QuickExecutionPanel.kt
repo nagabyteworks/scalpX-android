@@ -499,15 +499,11 @@ private fun RatchetTweakItem(
 fun QuickExecutionPanelPreview() {
     QuickExecutionPanel(
         selectedIndex = "NIFTY",
-        selectedExpiry = "28NOV24",
-        availableExpiries = persistentListOf("28NOV24", "05DEC24"),
+        selectedExpiry = "",
+        availableExpiries = persistentListOf(),
         product = "MIS",
-        strikes = persistentListOf(
-            OptionStrikeUi(24400.0, "1", "NIFTY24400CE", 14500L, "2", "NIFTY24400PE", 8500L),
-            OptionStrikeUi(24500.0, "3", "NIFTY24500CE", 9500L, "4", "NIFTY24500PE", 12000L),
-            OptionStrikeUi(24600.0, "5", "NIFTY24600CE", 6000L, "6", "NIFTY24600PE", 17500L)
-        ),
-        selectedStrike = 24500.0,
+        strikes = persistentListOf(),
+        selectedStrike = null,
         selectedLots = 2,
         lotSize = 25,
         ladderDraft = LadderDraftUi(),

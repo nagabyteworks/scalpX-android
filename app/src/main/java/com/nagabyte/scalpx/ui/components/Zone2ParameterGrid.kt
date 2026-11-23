@@ -1,15 +1,12 @@
 package com.nagabyte.scalpx.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Remove
@@ -19,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +27,7 @@ import com.nagabyte.scalpx.ui.theme.TradingTypography
 import kotlinx.collections.immutable.ImmutableList
 
 /**
- * Zone 2: 2-Row Parameter Selector Grid + Safety Toggle & Ratchet SL Pill.
+ * Zone 2: Parameter selector grid and ratchet SL settings.
  * Can be collapsed into a single compact summary chip row to maximize chart/ladder space.
  */
 @Composable
@@ -45,7 +41,6 @@ fun Zone2ParameterGrid(
     selectedLots: Int,
     lotSize: Int,
     ladderDraft: LadderDraftUi,
-    oneClickEnabled: Boolean,
     isCollapsed: Boolean,
     onSelectIndex: (String) -> Unit,
     onSelectExpiry: (String) -> Unit,
@@ -53,7 +48,6 @@ fun Zone2ParameterGrid(
     onStepCallStrike: (Int) -> Unit,
     onStepPutStrike: (Int) -> Unit,
     onStepLots: (Int) -> Unit,
-    onToggleOneClick: (Boolean) -> Unit,
     onToggleCollapse: (Boolean) -> Unit,
     onOpenRatchetConfig: () -> Unit,
     modifier: Modifier = Modifier
@@ -176,7 +170,7 @@ fun Zone2ParameterGrid(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Expanded View: Row 3 (Ratchet Config Pill + One-Click Checkbox + Collapse)
+                // Expanded View: Row 3 (Ratchet Config Pill + Collapse)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -210,56 +204,16 @@ fun Zone2ParameterGrid(
                         }
                     }
 
-                    // Right: One-Click Checkbox + Collapse Chevron
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    IconButton(
+                        onClick = { onToggleCollapse(true) },
+                        modifier = Modifier.size(24.dp)
                     ) {
-                        // 1Cliq-style Red-accented Checkbox
-                        Row(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .clickable { onToggleOneClick(!oneClickEnabled) }
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(if (oneClickEnabled) colors.sellRed else Color.Transparent)
-                                    .border(1.dp, if (oneClickEnabled) colors.sellRed else colors.border, RoundedCornerShape(3.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (oneClickEnabled) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "One Click Enabled",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = "One click: ${if (oneClickEnabled) "Enabled" else "Disabled"}",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textPrimary
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { onToggleCollapse(true) },
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Collapse Parameters",
-                                tint = colors.textSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Collapse Parameters",
+                            tint = colors.textSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }

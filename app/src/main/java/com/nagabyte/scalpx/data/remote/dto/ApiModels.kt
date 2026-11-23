@@ -73,7 +73,8 @@ data class SensexSpotDto(
     val timestamp: Long? = null,
     val ageMs: Long? = null,
     val marketDataReady: Boolean = false,
-    val validation: String? = null
+    val validation: String? = null,
+    val error: String? = null
 )
 
 @Serializable
@@ -89,16 +90,22 @@ data class OptionStrikeDto(
     val strikePrice: Double,
     val ceToken: String? = null,
     val ceSymbol: String? = null,
+    val ceLotSize: Int? = null,
     val ceLtpPaise: Long? = null,
+    val ceTimestamp: Long? = null,
     val peToken: String? = null,
     val peSymbol: String? = null,
-    val peLtpPaise: Long? = null
+    val peLotSize: Int? = null,
+    val peLtpPaise: Long? = null,
+    val peTimestamp: Long? = null
 )
 
 @Serializable
 data class OptionChainResponse(
     val symbol: String,
     val expiry: String,
+    val exchange: String = "NFO",
+    val expiries: List<String> = emptyList(),
     val strikes: List<OptionStrikeDto> = emptyList(),
     val atmStrike: Double? = null,
     val dataSource: String? = null,
@@ -196,6 +203,7 @@ data class TodayTradesResponse(
 data class PositionSnapshotItemDto(
     val token: String,
     val symbol: String,
+    val side: String = "BUY",
     val quantity: Int,
     val entryPricePaise: Long,
     val currentLtpPaise: Long,
@@ -213,7 +221,32 @@ data class TradingSnapshotMessage(
     val type: String = "SNAPSHOT",
     val timestamp: Long,
     val openPositionsCount: Int,
-    val positions: List<PositionSnapshotItemDto> = emptyList()
+    val positions: List<PositionSnapshotItemDto> = emptyList(),
+    val marketData: MarketDataSnapshotDto? = null
+)
+
+@Immutable
+@Serializable
+data class MarketDataSnapshotDto(
+    val indexSymbol: String,
+    val spotToken: String,
+    val spotLtpPaise: Long? = null,
+    val spotTimestamp: Long? = null,
+    val selectedExpiry: String,
+    val atmStrike: Double,
+    val ceSymbol: String,
+    val ceToken: String,
+    val ceLotSize: Int? = null,
+    val ceLtpPaise: Long? = null,
+    val ceTimestamp: Long? = null,
+    val peSymbol: String,
+    val peToken: String,
+    val peLotSize: Int? = null,
+    val peLtpPaise: Long? = null,
+    val peTimestamp: Long? = null,
+    val marketDataTimestamp: Long? = null,
+    val feedStatus: String,
+    val strikes: List<OptionStrikeDto> = emptyList()
 )
 
 @Serializable

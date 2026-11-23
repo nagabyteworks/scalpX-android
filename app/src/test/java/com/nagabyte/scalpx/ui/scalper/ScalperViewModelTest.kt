@@ -53,6 +53,7 @@ class ScalperViewModelTest {
                 token = "26000",
                 symbol = "NIFTY26NOV24500CE",
                 ltpPaise = 10000L,
+                marketDataTimestamp = System.currentTimeMillis(),
                 lotSize = 25
             )
         )
@@ -66,6 +67,7 @@ class ScalperViewModelTest {
                 token = "26000",
                 symbol = "NIFTY26NOV24500CE",
                 ltpPaise = 10000L,
+                marketDataTimestamp = System.currentTimeMillis(),
                 lotSize = 25
             )
         )
@@ -79,6 +81,7 @@ class ScalperViewModelTest {
                 token = "26000",
                 symbol = "NIFTY26NOV24500CE",
                 ltpPaise = 10000L,
+                marketDataTimestamp = System.currentTimeMillis(),
                 lotSize = 25
             )
         )
@@ -210,6 +213,7 @@ class ScalperViewModelTest {
                 token = "26000",
                 symbol = "NIFTY26NOV24500CE",
                 ltpPaise = 10001L,
+                marketDataTimestamp = System.currentTimeMillis(),
                 lotSize = 25
             )
         )
@@ -313,6 +317,60 @@ class ScalperViewModelTest {
     }
 
     @Test
+    fun `incoming market snapshots immediately update spot and option prices`() = runTest(testDispatcher) {
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        val updateTime = System.currentTimeMillis()
+        fakeRepo.emitSnapshot(fakeRepo.marketSnapshot(
+            spotLtpPaise = 8_201_000L,
+            callLtpPaise = 12_500L,
+            putLtpPaise = 11_250L,
+            timestamp = updateTime
+        ))
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(8_201_000L, viewModel.uiState.value.spotLtpPaise)
+        assertEquals("READY", viewModel.uiState.value.spotStatus)
+        assertEquals(12_500L, viewModel.uiState.value.strikes.single().ceLtpPaise)
+        assertEquals(11_250L, viewModel.uiState.value.strikes.single().peLtpPaise)
+        assertEquals(updateTime, viewModel.uiState.value.strikes.single().ceTimestamp)
+    }
+
+    @Test
+    fun `startup retries waiting spot until ready and then requests the option chain`() = runTest(testDispatcher) {
+        fakeRepo.waitingSpotResponses = 1
+
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(fakeRepo.indexSpotCallCount >= 2)
+        assertEquals(1, fakeRepo.optionChainCallCount)
+        assertEquals("READY", viewModel.uiState.value.spotStatus)
+    }
+
+    @Test
+    fun `Sell action dispatches a direct short order with a lower first target`() = runTest(testDispatcher) {
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+        testScheduler.advanceUntilIdle()
+
+        viewModel.handleIntent(
+            ScalperIntent.OneClickSell(
+                token = "26000",
+                symbol = "SENSEX26NOV2682000CE",
+                ltpPaise = 10_000L,
+                marketDataTimestamp = System.currentTimeMillis(),
+                lotSize = 20
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        assertEquals("SELL", fakeRepo.lastSubmittedSide)
+        assertEquals(9_000L, fakeRepo.lastSubmittedFirstMilestonePaise)
+        assertEquals(1, fakeRepo.oneClickOrderCallCount.get())
+    }
+
+    @Test
     fun `invalid broker session does not open an app authentication sheet`() = runTest(testDispatcher) {
         fakeRepo.healthBrokerConnected = false
         fakeRepo.healthSessionValidity = "INVALID"
@@ -330,7 +388,11 @@ class ScalperViewModelTest {
         configStore = createDummyConfigStore()
     ) {
         val oneClickOrderCallCount = AtomicInteger(0)
+        var indexSpotCallCount = 0
+        var optionChainCallCount = 0
+        var waitingSpotResponses = 0
         var lastSubmittedFirstMilestonePaise: Long? = null
+        var lastSubmittedSide: String? = null
         var lastPatchedToken: String? = null
         var lastPatchedNextMilestonePaise: Long? = null
 
@@ -351,6 +413,57 @@ class ScalperViewModelTest {
 
         private val testPing = MutableStateFlow(12L)
         override val pingMs = testPing
+
+        override fun connectWebSocket() {
+            testSnapshotFlow.value = marketSnapshot().copy(marketData = null)
+        }
+
+        override fun disconnectWebSocket() {}
+
+        fun marketSnapshot(
+            spotLtpPaise: Long = 8_200_000L,
+            callLtpPaise: Long = 10_000L,
+            putLtpPaise: Long = 9_000L,
+            timestamp: Long = System.currentTimeMillis()
+        ) = TradingSnapshotMessage(
+            timestamp = timestamp,
+            openPositionsCount = 0,
+            marketData = MarketDataSnapshotDto(
+                indexSymbol = "SENSEX",
+                spotToken = "901",
+                spotLtpPaise = spotLtpPaise,
+                spotTimestamp = timestamp,
+                selectedExpiry = "2026-11-26",
+                atmStrike = 82_000.0,
+                ceSymbol = "SENSEX26NOV2682000CE",
+                ceToken = "26000",
+                ceLotSize = 20,
+                ceLtpPaise = callLtpPaise,
+                ceTimestamp = timestamp,
+                peSymbol = "SENSEX26NOV2682000PE",
+                peToken = "26001",
+                peLotSize = 20,
+                peLtpPaise = putLtpPaise,
+                peTimestamp = timestamp,
+                marketDataTimestamp = timestamp,
+                feedStatus = "CONNECTED",
+                strikes = listOf(
+                    OptionStrikeDto(
+                        strikePrice = 82_000.0,
+                        ceToken = "26000",
+                        ceSymbol = "SENSEX26NOV2682000CE",
+                        ceLotSize = 20,
+                        ceLtpPaise = callLtpPaise,
+                        ceTimestamp = timestamp,
+                        peToken = "26001",
+                        peSymbol = "SENSEX26NOV2682000PE",
+                        peLotSize = 20,
+                        peLtpPaise = putLtpPaise,
+                        peTimestamp = timestamp
+                    )
+                )
+            )
+        )
 
         suspend fun emitSnapshot(snapshot: TradingSnapshotMessage) {
             testSnapshotFlow.value = snapshot
@@ -396,11 +509,29 @@ class ScalperViewModelTest {
         )
 
         override suspend fun getOptionChain(symbol: String, expiry: String, strikes: Int): ApiResult<OptionChainResponse> {
+            optionChainCallCount++
             return ApiResult.Success(
                 OptionChainResponse(
                     symbol = symbol,
                     expiry = "26-NOV-2026",
                     strikes = emptyList()
+                )
+            )
+        }
+
+        override suspend fun getIndexSpot(symbol: String): ApiResult<SensexSpotDto> {
+            indexSpotCallCount++
+            val waiting = waitingSpotResponses > 0
+            if (waiting) waitingSpotResponses--
+            return ApiResult.Success(
+                SensexSpotDto(
+                    index = symbol,
+                    exchange = if (symbol == "SENSEX") "BSE" else "NSE",
+                    status = if (waiting) "WAITING_FOR_TICK" else "READY",
+                    spotLtpPaise = if (waiting) null else 8_200_000L,
+                    timestamp = if (waiting) null else System.currentTimeMillis(),
+                    ageMs = if (waiting) null else 0L,
+                    marketDataReady = !waiting
                 )
             )
         }
@@ -421,10 +552,12 @@ class ScalperViewModelTest {
         ): ApiResult<LadderPositionDto> {
             oneClickOrderCallCount.incrementAndGet()
             lastSubmittedFirstMilestonePaise = firstMilestonePaise
+            lastSubmittedSide = side
             return ApiResult.Success(
                 LadderPositionDto(
                     token = token,
                     symbol = symbol,
+                    side = side,
                     quantity = lots * lotSize,
                     entryPricePaise = 10000L,
                     nextMilestonePaise = firstMilestonePaise ?: 11000L,

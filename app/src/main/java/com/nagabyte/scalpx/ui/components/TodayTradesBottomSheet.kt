@@ -154,21 +154,8 @@ fun TodayTradesBottomSheet(
 @Composable
 fun TodayTradesBottomSheetPreview() {
     TodayTradesBottomSheet(
-        trades = persistentListOf(
-            LadderPositionDto(
-                token = "26000",
-                symbol = "NIFTY24DEC24500CE",
-                side = "BUY",
-                quantity = 50,
-                entryPricePaise = 10000L,
-                nextMilestonePaise = 11000L,
-                stepSizePaise = 500L,
-                breakoutBufferPaise = 100L,
-                slippageBufferPaise = 150L,
-                status = "EXITED"
-            )
-        ),
-        totalRealizedPnlPaise = 50000L,
+        trades = persistentListOf(),
+        totalRealizedPnlPaise = 0L,
         onDismiss = {}
     )
 }

@@ -24,13 +24,6 @@ enum class MessageType {
 }
 
 @Immutable
-data class PendingOrderConfirmation(
-    val title: String,
-    val message: String,
-    val onConfirm: () -> Unit
-)
-
-@Immutable
 data class OrderBookItemUi(
     val orderId: String,
     val symbol: String,
@@ -51,7 +44,11 @@ data class OptionStrikeUi(
     val ceLtpPaise: Long? = null,
     val peToken: String? = null,
     val peSymbol: String? = null,
-    val peLtpPaise: Long? = null
+    val peLtpPaise: Long? = null,
+    val ceLotSize: Int? = null,
+    val peLotSize: Int? = null,
+    val ceTimestamp: Long? = null,
+    val peTimestamp: Long? = null
 )
 
 @Immutable
@@ -119,6 +116,7 @@ data class ScalperUiState(
     val userId: String = "",
 
     val selectedIndex: String = "SENSEX",
+    val selectedExchange: String = "BFO",
     val selectedExpiry: String = "",
     val strikes: ImmutableList<OptionStrikeUi> = persistentListOf(),
     val availableExpiries: ImmutableList<String> = persistentListOf(),
@@ -133,17 +131,17 @@ data class ScalperUiState(
 
     val spotLtpPaise: Long = 0L,
     val spotStatus: String = "WAITING_FOR_TICK",
+    val marketDataTimestamp: Long? = null,
+    val feedConnectionStatus: String = "DISCONNECTED",
+    val marketDataError: String? = null,
     val spotChangePts: Double = 0.0,
     val spotChangePercent: Double = 0.0,
 
-    val oneClickEnabled: Boolean = true,
     val isZone2Collapsed: Boolean = false,
     val isTableView: Boolean = false,
     val activeTab: BookTab = BookTab.POSITIONS,
     val isDarkTheme: Boolean = false,
     val isRatchetConfigOpen: Boolean = false,
-    val pendingConfirmation: PendingOrderConfirmation? = null,
-
     val lastServerMessage: String = "-",
     val lastServerMessageType: MessageType = MessageType.INFO,
 
