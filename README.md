@@ -48,12 +48,21 @@ waiting, stale, disconnected, or reconnecting state. A fresh spot automatically
 triggers the option-chain request; the backend returns verified expiries,
 contracts and lot sizes and selects the nearest available ATM CE/PE pair.
 
+Contract metadata is resolved only on the backend from Flattrade's current
+NFO/BFO index-derivatives Scrip Master. The app receives the actual listed
+symbols, tokens, expiries, strikes and lot sizes; it never creates option
+symbols or tokens. Prices come only from fresh authenticated Flattrade
+WebSocket ticks, not from the contract master or local estimates.
+
 The backend sends an initial WebSocket snapshot and coalesced updates containing
 position state plus the selected market data. Android applies each market
 snapshot to its MVI state, including the spot and per-contract timestamps, then
 renders current prices only when their ticks are fresh. Feed status and
 authentication, token-resolution, or subscription failures are surfaced as
-status/error text. Changing index or expiry requests an updated chain; all
+status/error text, including the backend's structured error code. WebSocket
+snapshot parse failures are logged in debug builds without logging frame
+contents. Changing index or expiry cancels obsolete requests and requests an
+updated chain; all
 verified contracts for that expiry are subscribed, so selecting another ATM
 strike uses its already-streamed CE/PE ticks. After WebSocket reconnect, the
 backend re-subscribes to broker instruments and the app resumes from current

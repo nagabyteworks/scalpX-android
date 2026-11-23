@@ -26,6 +26,7 @@ fun Zone3SpotPanicHub(
     selectedIndex: String,
     spotLtpPaise: Long,
     spotStatus: String,
+    marketDataError: String?,
     spotChangePts: Double,
     spotChangePercent: Double,
     lastServerMessage: String,
@@ -69,8 +70,11 @@ fun Zone3SpotPanicHub(
                     text = if (liveSpotAvailable) "LTP: $formattedLtp" else when (spotStatus) {
                         "STALE" -> "Spot data stale"
                         "INSTRUMENT_UNAVAILABLE" -> "Spot token unavailable"
+                        "BROKER_SESSION_UNAVAILABLE" -> "Broker session expired"
+                        "SUBSCRIPTION_REJECTED" -> "Subscription rejected"
+                        "DISCONNECTED", "WEBSOCKET_NOT_CONNECTED" -> "Feed disconnected"
                         "UNAVAILABLE" -> "Spot unavailable"
-                        else -> "Waiting for live spot"
+                        else -> marketDataError ?: "Waiting for live spot"
                     },
                     style = TradingTypography.TabularDigitsBold,
                     fontSize = 11.sp,

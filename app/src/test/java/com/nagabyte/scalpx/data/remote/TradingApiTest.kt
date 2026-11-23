@@ -5,6 +5,7 @@ import com.nagabyte.scalpx.data.remote.dto.*
 import com.nagabyte.scalpx.data.repository.ApiResult
 import com.nagabyte.scalpx.data.repository.TradingRepository
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
@@ -215,6 +216,30 @@ class TradingApiTest {
         assertEquals(8123456L, spot.spotLtpPaise)
         assertTrue(spot.marketDataReady)
         assertEquals("/api/market-data/sensex", mockWebServer.takeRequest().path)
+    }
+
+    @Test
+    fun `repository preserves structured market-data error code and message`() = runBlocking {
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(503)
+                .setHeader("Content-Type", "application/json")
+                .setBody(
+                    """{"index":"NIFTY","status":"WAITING_FOR_TICK","error":{"code":"INITIAL_TICK_NOT_RECEIVED","message":"Waiting for first tick"}}"""
+                )
+        )
+        val wsClient = TradingWsClient(OkHttpClient.Builder().build(), fakeConfigStore)
+        val repository = TradingRepository(tradingApi, wsClient, fakeConfigStore)
+
+        val result = repository.getIndexSpot("NIFTY")
+
+        assertTrue(result is ApiResult.Error)
+        result as ApiResult.Error
+        assertEquals("INITIAL_TICK_NOT_RECEIVED", result.errorCode)
+        assertTrue(result.message.contains("Waiting for first tick"))
+        assertTrue(result.message.contains("INITIAL_TICK_NOT_RECEIVED"))
+        assertEquals("/api/market-data/index?symbol=NIFTY", mockWebServer.takeRequest().path)
+        wsClient.disconnect()
     }
 
     @Test

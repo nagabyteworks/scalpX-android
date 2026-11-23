@@ -1,5 +1,7 @@
 package com.nagabyte.scalpx.data.remote
 
+import android.util.Log
+import com.nagabyte.scalpx.BuildConfig
 import com.nagabyte.scalpx.data.local.ConfigStore
 import com.nagabyte.scalpx.data.remote.dto.PriorityEventMessage
 import com.nagabyte.scalpx.data.remote.dto.TradingSnapshotMessage
@@ -9,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
@@ -78,8 +82,15 @@ class TradingWsClient(
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 scope.launch {
-                    try {
-                        if (text.contains("\"type\"") && text.contains("\"SNAPSHOT\"")) {
+                    val root = try {
+                        json.parseToJsonElement(text) as? JsonObject
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val messageType = root?.get("type")
+                        ?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
+                    if (messageType == "SNAPSHOT") {
+                        try {
                             val snapshot = json.decodeFromString<TradingSnapshotMessage>(text)
                             val now = System.currentTimeMillis()
                             if (snapshot.timestamp > 0) {
@@ -88,16 +99,18 @@ class TradingWsClient(
                                 _connectionState.value = WsConnectionState.Connected(age)
                             }
                             _snapshotFlow.emit(snapshot)
-                        } else {
-                            try {
-                                val event = json.decodeFromString<PriorityEventMessage>(text)
-                                _priorityEventFlow.emit(event)
-                            } catch (_: Exception) {
-                                // Unknown event type; ignore gracefully to avoid crashing
-                            }
+                        } catch (_: Exception) {
+                            if (BuildConfig.DEBUG) Log.w(TAG, "Failed to parse backend snapshot")
                         }
-                    } catch (_: Exception) {
-                        // Skip malformed frames
+                    } else if (messageType != null) {
+                        try {
+                            val event = json.decodeFromString<PriorityEventMessage>(text)
+                            _priorityEventFlow.emit(event)
+                        } catch (_: Exception) {
+                            if (BuildConfig.DEBUG) Log.w(TAG, "Failed to parse backend event type=$messageType")
+                        }
+                    } else if (BuildConfig.DEBUG) {
+                        Log.w(TAG, "Ignored backend WebSocket frame without a message type")
                     }
                 }
             }
@@ -146,6 +159,7 @@ class TradingWsClient(
     }
 
     companion object {
+        private const val TAG = "TradingWsClient"
         private const val PING_INTERVAL_SEC = 5L
         private const val INITIAL_BACKOFF_MS = 1000L
         private const val MAX_BACKOFF_MS = 16000L

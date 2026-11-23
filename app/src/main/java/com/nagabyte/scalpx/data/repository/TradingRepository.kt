@@ -10,11 +10,14 @@ import com.nagabyte.scalpx.data.remote.dto.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import retrofit2.HttpException
 import java.io.IOException
 import java.util.UUID
@@ -212,13 +215,17 @@ open class TradingRepository(
             ApiResult.Success(call())
         } catch (e: HttpException) {
             val errorBody = e.response()?.errorBody()?.string()
+            val apiError = errorBody?.let(::parseApiError)
             ApiResult.Error(
-                message = errorBody?.let(::parseApiError)
+                message = apiError?.message
                     ?: e.message()
                     ?: "HTTP ${e.code()}",
                 statusCode = e.code(),
-                cause = e
+                cause = e,
+                errorCode = apiError?.code
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: IOException) {
             ApiResult.Error(
                 message = "Network error: ${e.message ?: "Server unreachable"}",
@@ -233,14 +240,28 @@ open class TradingRepository(
 
     }
 
-    private fun parseApiError(body: String): String {
+    private data class ParsedApiError(val message: String, val code: String?)
+
+    private fun parseApiError(body: String): ParsedApiError {
         return try {
             val decoded = json.decodeFromString<ApiErrorResponse>(body)
-            decoded.message.takeIf { it.isNotBlank() }
-                ?: decoded.error.takeIf { it.isNotBlank() }
+            val nestedError = decoded.error as? JsonObject
+            val errorMessage = when (val error = decoded.error) {
+                is JsonPrimitive -> error.content.takeIf { error.isString && it.isNotBlank() }
+                is JsonObject -> nestedError?.get("message")?.jsonPrimitive?.content
+                else -> null
+            }
+            val message = decoded.message.takeIf { it.isNotBlank() }
+                ?: errorMessage
                 ?: "Market-data request failed"
+            val code = decoded.code
+                ?: nestedError?.get("code")?.jsonPrimitive?.content
+            ParsedApiError(
+                message = if (code != null && !message.contains(code)) "$message ($code)" else message,
+                code = code
+            )
         } catch (_: Exception) {
-            "Market-data request failed"
+            ParsedApiError("Market-data request failed", null)
         }
     }
 

@@ -146,6 +146,7 @@ fun ScalperCockpitScreen(
                         selectedIndex = state.selectedIndex,
                         spotLtpPaise = state.spotLtpPaise,
                         spotStatus = state.spotStatus,
+                        marketDataError = state.marketDataError,
                         spotChangePts = state.spotChangePts,
                         spotChangePercent = state.spotChangePercent,
                         lastServerMessage = state.lastServerMessage,

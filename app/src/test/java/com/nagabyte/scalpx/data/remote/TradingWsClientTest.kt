@@ -72,7 +72,20 @@ class TradingWsClientTest {
                                         "isPaused": false,
                                         "status": "OPEN"
                                     }
-                                ]
+                                ],
+                                "marketData": {
+                                    "indexSymbol": "SENSEX",
+                                    "spotExchange": "BSE",
+                                    "spotToken": "901",
+                                    "selectedExpiry": "2026-11-26",
+                                    "atmStrike": 82000,
+                                    "ceSymbol": "SENSEX26NOV2682000CE",
+                                    "ceToken": "910",
+                                    "peSymbol": "SENSEX26NOV2682000PE",
+                                    "peToken": "911",
+                                    "marketDataReady": true,
+                                    "feedStatus": "CONNECTED"
+                                }
                             }
                         """.trimIndent())
                     }
@@ -97,6 +110,8 @@ class TradingWsClientTest {
         assertEquals(11500L, pos.nextMilestonePaise)
         assertEquals(11000L, pos.activeSlTriggerPaise)
         assertEquals(10850L, pos.activeSlLimitPaise)
+        assertEquals("BSE", snapshot.marketData?.spotExchange)
+        assertTrue(snapshot.marketData?.marketDataReady == true)
     }
 
     @Test

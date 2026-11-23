@@ -79,8 +79,9 @@ data class SensexSpotDto(
 
 @Serializable
 data class ApiErrorResponse(
-    val error: String = "",
+    val error: JsonElement? = null,
     val message: String = "",
+    val code: String? = null,
     val remainingSec: Int? = null,
     val fallbackRequired: Boolean = false
 )
@@ -229,6 +230,7 @@ data class TradingSnapshotMessage(
 @Serializable
 data class MarketDataSnapshotDto(
     val indexSymbol: String,
+    val spotExchange: String = "NSE",
     val spotToken: String,
     val spotLtpPaise: Long? = null,
     val spotTimestamp: Long? = null,
@@ -245,6 +247,7 @@ data class MarketDataSnapshotDto(
     val peLtpPaise: Long? = null,
     val peTimestamp: Long? = null,
     val marketDataTimestamp: Long? = null,
+    val marketDataReady: Boolean = false,
     val feedStatus: String,
     val strikes: List<OptionStrikeDto> = emptyList()
 )

@@ -165,7 +165,10 @@ class ScalperViewModel(
 
     private fun applyMarketDataSnapshot(market: MarketDataSnapshotDto) {
         _uiState.update { current ->
-            if (market.indexSymbol != current.selectedIndex) return@update current
+            if (market.indexSymbol != current.selectedIndex ||
+                (current.selectedExpiry.isNotBlank() && market.selectedExpiry != current.selectedExpiry)) {
+                return@update current
+            }
 
             val updatedStrikes = market.strikes.map { strike ->
                 OptionStrikeUi(
@@ -701,6 +704,8 @@ class ScalperViewModel(
     }
 
     private fun selectIndex(index: String) {
+        optionChainRefreshJob?.cancel()
+        optionChainRefreshJob = null
         _uiState.update {
             it.copy(
                 selectedIndex = index,
@@ -840,7 +845,8 @@ class ScalperViewModel(
                     }
                 }
                 is ApiResult.Error -> {
-                    if (_uiState.value.selectedIndex != symbol) return@launch
+                    if (_uiState.value.selectedIndex != symbol ||
+                        _uiState.value.selectedExpiry != expiry) return@launch
                     _uiState.update {
                         it.copy(
                             strikes = persistentListOf(),
@@ -896,10 +902,20 @@ class ScalperViewModel(
                         )
                     }
                     is ApiResult.Error -> {
+                        val status = when (result.errorCode) {
+                            "BROKER_SESSION_UNAVAILABLE" -> "BROKER_SESSION_UNAVAILABLE"
+                            "INDEX_NOT_FOUND", "INVALID_INDEX_TOKEN", "AMBIGUOUS_INDEX", "INVALID_INDEX_EXCHANGE" ->
+                                "INSTRUMENT_UNAVAILABLE"
+                            "WEBSOCKET_NOT_CONNECTED" -> "DISCONNECTED"
+                            "SUBSCRIPTION_REJECTED" -> "SUBSCRIPTION_REJECTED"
+                            "STALE_MARKET_DATA" -> "STALE"
+                            else -> "UNAVAILABLE"
+                        }
                         _uiState.update {
                             it.copy(
                                 spotLtpPaise = 0L,
-                                spotStatus = "UNAVAILABLE",
+                                spotStatus = status,
+                                feedConnectionStatus = status,
                                 marketDataError = result.message,
                                 lastServerMessage = result.message,
                                 lastServerMessageType = MessageType.ERROR

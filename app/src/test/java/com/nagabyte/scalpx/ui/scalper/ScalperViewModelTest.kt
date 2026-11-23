@@ -513,7 +513,7 @@ class ScalperViewModelTest {
             return ApiResult.Success(
                 OptionChainResponse(
                     symbol = symbol,
-                    expiry = "26-NOV-2026",
+                    expiry = "2026-11-26",
                     strikes = emptyList()
                 )
             )
