@@ -13,22 +13,21 @@ The dashboard collapse was caused by layout and inset changes that no longer sup
 - the dashboard body relied on a constrained/non-scrollable area and could lose all available content height;
 - the recent surface structure could place the toolbar without preserving the expected top-to-bottom dashboard flow.
 
-The recent header change did not remove any trading components. The layout correction restores sizing and scrolling around the existing components.
+The recent header change did not remove any trading components. The layout correction removes the nested Scaffold measurement, uses an explicit fixed-height toolbar, and gives the scrollable body the remaining weighted height.
 
 ## Implementation
 
 `MainActivity` enables AndroidX edge-to-edge rendering and keeps the full-screen Compose root.
 
-`ScalperCockpitScreen` uses Material 3 `Scaffold` with:
+`ScalperCockpitScreen` uses a direct full-screen `Column` with:
 
 - `fillMaxSize()` on the root;
 - `WindowInsets.safeDrawing` for system UI content;
-- the broker header as the pinned top bar;
-- full-width, full-height dashboard content below the scaffold content padding;
-- vertical scrolling for the parameter, market, execution, tab, and position sections;
+- a fixed 44 dp broker header at the top;
+- `weight(1f)` on the full-width scrollable dashboard body;
 - bounded minimum position-content height instead of a fixed screen height.
 
-`Zone1BrokerHeader` applies status-bar and display-cutout top insets while retaining the existing broker name, LIVE badge, latency, Connect Broker action, theme control, and settings control.
+`Zone1BrokerHeader` retains the existing broker name, LIVE badge, latency, Connect Broker action, theme control, and settings control.
 
 ## Invariants
 

@@ -25,11 +25,11 @@ Flattrade authentication is a separate browser flow:
 
 ## Trading dashboard layout
 
-The main dashboard is implemented with Compose `Scaffold` in `ScalperCockpitScreen`.
+The main dashboard is implemented with a direct Compose `Column` in `ScalperCockpitScreen`.
 
 - The broker toolbar is the pinned `topBar` and remains directly below system UI.
-- `WindowInsets.safeDrawing` is applied by `Scaffold` so status, navigation, and cutout regions are accounted for.
-- The broker header additionally applies status-bar and display-cutout top insets.
+- `WindowInsets.safeDrawing` is applied to the root so status, navigation, and cutout regions are accounted for.
+- The broker header is fixed at 44 dp and remains the first child.
 - The complete dashboard body uses a bounded, full-width/full-height column and vertical scrolling.
 - The positions, order-book, and trade-book section has a bounded content height inside the scrollable dashboard.
 - No dashboard section is removed or vertically centred.

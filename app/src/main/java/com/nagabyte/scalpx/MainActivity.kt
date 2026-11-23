@@ -50,7 +50,9 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        enableSecureScreen()
+        if (!BuildConfig.DEBUG) {
+            enableSecureScreen()
+        }
 
         // Handle initial deep link if app launched via URI
         intent?.data?.let { uri ->

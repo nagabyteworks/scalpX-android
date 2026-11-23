@@ -46,12 +46,7 @@ fun Zone1BrokerHeader(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .windowInsetsPadding(
-                WindowInsets.statusBars
-                    .union(WindowInsets.displayCutout)
-                    .only(WindowInsetsSides.Top)
-            )
-            .heightIn(min = 44.dp),
+            .height(44.dp),
         color = colors.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, colors.border)
     ) {

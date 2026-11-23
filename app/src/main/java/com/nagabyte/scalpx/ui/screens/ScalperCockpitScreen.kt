@@ -101,28 +101,28 @@ fun ScalperCockpitScreen(
             }
         }
 
-        Scaffold(
-            modifier = modifier.fillMaxSize(),
-            containerColor = colors.background,
-            contentWindowInsets = WindowInsets.safeDrawing,
-            topBar = {
-                // ZONE 1: Pinned Top Header Bar (~44dp)
-                Zone1BrokerHeader(
-                    serverWsState = state.serverWsState,
-                    brokerConnected = state.brokerConnected,
-                    wsFeedHealthy = state.wsFeedHealthy,
-                    pingMs = state.pingMs,
-                    isDarkTheme = state.isDarkTheme,
-                    onConnectOtp = { onIntent(ScalperIntent.OpenDailyOtpSheet) },
-                    onToggleTheme = { onIntent(ScalperIntent.ToggleTheme(it)) },
-                    onOpenSettings = { onIntent(ScalperIntent.OpenSettings(true)) }
-                )
-            }
-        ) { paddingValues ->
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .background(colors.background)
+        ) {
+            // ZONE 1: Pinned Top Header Bar
+            Zone1BrokerHeader(
+                serverWsState = state.serverWsState,
+                brokerConnected = state.brokerConnected,
+                wsFeedHealthy = state.wsFeedHealthy,
+                pingMs = state.pingMs,
+                isDarkTheme = state.isDarkTheme,
+                onConnectOtp = { onIntent(ScalperIntent.OpenDailyOtpSheet) },
+                onToggleTheme = { onIntent(ScalperIntent.ToggleTheme(it)) },
+                onOpenSettings = { onIntent(ScalperIntent.OpenSettings(true)) }
+            )
+
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
+                    .weight(1f)
+                    .fillMaxWidth()
                     .background(colors.background)
                     .verticalScroll(rememberScrollState())
             ) {
