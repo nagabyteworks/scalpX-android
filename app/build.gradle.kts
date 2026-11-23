@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,15 +5,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Load .env properties from root or app directory
-val envProps = Properties().apply {
-    val envFile = rootProject.file(".env").takeIf { it.exists() } ?: project.file(".env").takeIf { it.exists() }
-    envFile?.inputStream()?.use { load(it) }
+val configuredServer = providers.gradleProperty("SERVER").orNull?.trim()?.lowercase() ?: "dev"
+if (configuredServer !in setOf("dev", "prod")) {
+    throw GradleException("SERVER must be either 'dev' or 'prod'; received '$configuredServer'.")
 }
+val devServerUrl = providers.gradleProperty("DEV_SERVER_URL").orNull?.trim()
+    ?.takeIf(String::isNotEmpty)
+    ?: "http://10.0.2.2:3000"
 
-fun getEnv(key: String, fallback: String = ""): String {
-    return envProps.getProperty(key)?.trim() ?: System.getenv(key) ?: fallback
-}
+fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "com.nagabyte.scalpx"
@@ -36,13 +34,14 @@ android {
         manifestPlaceholders["authDeepLinkScheme"] = "scalper"
         manifestPlaceholders["authDeepLinkHost"] = "auth"
 
-        buildConfigField("String", "ENV_BASE_URL", "\"${getEnv("SCALPX_BASE_URL", "https://trade.nagabyte.com")}\"")
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            buildConfigField("String", "SERVER", "\"prod\"")
+            buildConfigField("String", "DEV_SERVER_URL", "\"\"")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -50,6 +49,8 @@ android {
         }
         debug {
             isDebuggable = true
+            buildConfigField("String", "SERVER", buildConfigString(configuredServer))
+            buildConfigField("String", "DEV_SERVER_URL", buildConfigString(devServerUrl))
         }
     }
 

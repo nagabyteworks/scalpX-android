@@ -21,6 +21,19 @@ Flattrade authentication is a separate browser flow:
 3. The backend handles the callback and broker session.
 4. Android receives only backend status and live market/position updates.
 
+## Backend environments
+
+The Android `SERVER` Gradle property selects one base URL for both REST and
+WebSocket traffic. Debug defaults to `dev` at the Android Emulator host URL
+`http://10.0.2.2:3000`; `-PDEV_SERVER_URL=http://<mac-lan-ip>:3000` supports a
+physical phone when the local backend is bound to the LAN interface. Use
+`-PSERVER=prod` for the production backend. Release builds are pinned to
+`https://trade.nagabyte.com`, and only debug builds allow cleartext HTTP.
+Startup probes `/health` before opening the WebSocket, displays the selected
+environment and API reachability, and retries temporary failures with capped
+exponential backoff without switching environments. Detailed macOS, firewall,
+and build instructions are in [Development Environments](docs/development-environments.md).
+
 ---
 
 ## Trading dashboard layout

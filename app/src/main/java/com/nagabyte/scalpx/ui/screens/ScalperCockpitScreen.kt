@@ -11,6 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.nagabyte.scalpx.ui.auth.DailyOtpSheet
 import com.nagabyte.scalpx.ui.components.*
+import com.nagabyte.scalpx.data.remote.ServerConfig
 import com.nagabyte.scalpx.ui.scalper.*
 import com.nagabyte.scalpx.ui.theme.LocalScalperTheme
 import com.nagabyte.scalpx.ui.theme.ScalperTheme
@@ -81,6 +82,8 @@ fun ScalperCockpitScreen(
         ) {
             // ZONE 1: Pinned Top Header Bar
             Zone1BrokerHeader(
+                backendEnvironment = ServerConfig.environment.name,
+                backendReachability = state.backendReachability,
                 serverWsState = state.serverWsState,
                 brokerConnected = state.brokerConnected,
                 wsFeedHealthy = state.wsFeedHealthy,

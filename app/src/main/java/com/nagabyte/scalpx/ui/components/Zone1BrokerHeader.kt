@@ -31,6 +31,8 @@ import com.nagabyte.scalpx.ui.theme.TradingTypography
  */
 @Composable
 fun Zone1BrokerHeader(
+    backendEnvironment: String,
+    backendReachability: String,
     serverWsState: WsState,
     brokerConnected: Boolean,
     wsFeedHealthy: Boolean,
@@ -90,6 +92,21 @@ fun Zone1BrokerHeader(
                         color = badgeTextColor
                     )
                 }
+
+                val backendStatusColor = when (backendReachability) {
+                    "ONLINE" -> colors.profitGreenText
+                    "RETRYING" -> colors.warningColor
+                    "OFFLINE" -> colors.lossRedText
+                    else -> colors.textSecondary
+                }
+                Text(
+                    text = "$backendEnvironment: $backendReachability",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = backendStatusColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             // Right: connection state + Flattrade reconnect + theme + settings

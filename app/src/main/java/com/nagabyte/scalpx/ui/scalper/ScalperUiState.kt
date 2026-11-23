@@ -102,6 +102,7 @@ data class DailyOtpSheetState(
 
 @Immutable
 data class ScalperUiState(
+    val backendReachability: String = "CHECKING",
     val serverWsState: WsState = WsState.DISCONNECTED,
     val brokerConnected: Boolean = false,
     val sessionTokenPresent: Boolean = false,

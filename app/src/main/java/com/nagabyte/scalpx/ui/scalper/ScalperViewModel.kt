@@ -4,6 +4,7 @@ import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nagabyte.scalpx.core.MoneyFormatter
+import com.nagabyte.scalpx.data.remote.ServerConfig
 import com.nagabyte.scalpx.data.remote.WsConnectionState
 import com.nagabyte.scalpx.data.remote.dto.MarketDataSnapshotDto
 import com.nagabyte.scalpx.data.repository.ApiResult
@@ -34,6 +35,7 @@ class ScalperViewModel(
     val uiEffect: SharedFlow<ScalperUiEffect> = _uiEffect.asSharedFlow()
 
     private val lastTapTimestamps = ConcurrentHashMap<String, Long>()
+    private var backendConnectivityJob: Job? = null
     private var optionChainRefreshJob: Job? = null
     private var spotRefreshJob: Job? = null
     private var spotRetryDelayMs = SPOT_INITIAL_RETRY_DELAY_MS
@@ -41,10 +43,8 @@ class ScalperViewModel(
 
     init {
         observeRepositoryStreams()
-        refreshHealth()
         loadPresetsFromConfig()
-        repository.connectWebSocket()
-        refreshSensexSpot()
+        checkBackendConnectivity()
     }
 
     private fun loadPresetsFromConfig() {
@@ -729,6 +729,10 @@ class ScalperViewModel(
     }
 
     fun refreshHealth() {
+        if (_uiState.value.backendReachability != BACKEND_ONLINE) {
+            checkBackendConnectivity()
+            return
+        }
         viewModelScope.launch {
             when (val result = repository.getAuthStatus()) {
                 is ApiResult.Success -> {
@@ -747,12 +751,12 @@ class ScalperViewModel(
                     }
                 }
                 is ApiResult.Error -> {
-                    // Fallback to checkHealth() for backwards compatibility with health probe
                     when (val healthResult = repository.checkHealth()) {
                         is ApiResult.Success -> {
                             val h = healthResult.data
                             _uiState.update {
                                 it.copy(
+                                    backendReachability = BACKEND_ONLINE,
                                     brokerConnected = h.brokerConnected,
                                     wsFeedHealthy = h.wsFeedHealthy,
                                     tradingEnabled = h.tradingEnabled,
@@ -767,14 +771,18 @@ class ScalperViewModel(
                         is ApiResult.Error -> {
                             _uiState.update {
                                 it.copy(
+                                    backendReachability = BACKEND_OFFLINE,
                                     brokerConnected = false,
                                     sessionValid = false,
                                     sessionValidity = "UNKNOWN",
                                     wsFeedHealthy = false,
                                     tradingEnabled = false,
-                                    wsFeedStatus = "OFFLINE"
+                                    wsFeedStatus = "OFFLINE",
+                                    lastServerMessage = "${ServerConfig.environment} backend unreachable: ${healthResult.message}",
+                                    lastServerMessageType = MessageType.ERROR
                                 )
                             }
+                            checkBackendConnectivity()
                         }
                     }
                 }
@@ -783,7 +791,52 @@ class ScalperViewModel(
     }
 
     fun reconnectFeed() {
-        repository.connectWebSocket()
+        if (_uiState.value.backendReachability == BACKEND_ONLINE) {
+            repository.connectWebSocket()
+        } else {
+            checkBackendConnectivity()
+        }
+    }
+
+    private fun checkBackendConnectivity() {
+        if (backendConnectivityJob?.isActive == true) return
+        backendConnectivityJob = viewModelScope.launch {
+            var retryDelayMs = BACKEND_INITIAL_RETRY_DELAY_MS
+            while (true) {
+                when (val result = repository.checkHealth()) {
+                    is ApiResult.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                backendReachability = BACKEND_ONLINE,
+                                lastServerMessage = "${ServerConfig.environment} backend reachable",
+                                lastServerMessageType = MessageType.SUCCESS
+                            )
+                        }
+                        repository.connectWebSocket()
+                        refreshHealth()
+                        refreshSensexSpot()
+                        return@launch
+                    }
+                    is ApiResult.Error -> {
+                        val retryable = result.statusCode == null || result.statusCode >= 500
+                        _uiState.update {
+                            it.copy(
+                                backendReachability = if (retryable) BACKEND_RETRYING else BACKEND_OFFLINE,
+                                brokerConnected = false,
+                                wsFeedHealthy = false,
+                                tradingEnabled = false,
+                                wsFeedStatus = "OFFLINE",
+                                lastServerMessage = "${ServerConfig.environment} backend unreachable: ${result.message}",
+                                lastServerMessageType = MessageType.ERROR
+                            )
+                        }
+                        if (!retryable) return@launch
+                        delay(retryDelayMs)
+                        retryDelayMs = (retryDelayMs * 2).coerceAtMost(BACKEND_MAX_RETRY_DELAY_MS)
+                    }
+                }
+            }
+        }
     }
 
     fun refreshOptionChain(force: Boolean = true) {
@@ -865,6 +918,10 @@ class ScalperViewModel(
     }
 
     fun refreshSensexSpot() {
+        if (_uiState.value.backendReachability != BACKEND_ONLINE) {
+            checkBackendConnectivity()
+            return
+        }
         val symbol = _uiState.value.selectedIndex
         spotRetryDelayMs = SPOT_INITIAL_RETRY_DELAY_MS
         spotRefreshJob?.cancel()
@@ -986,6 +1043,11 @@ class ScalperViewModel(
 
     companion object {
         const val TAP_COOLDOWN_MS = 500L
+        private const val BACKEND_ONLINE = "ONLINE"
+        private const val BACKEND_RETRYING = "RETRYING"
+        private const val BACKEND_OFFLINE = "OFFLINE"
+        private const val BACKEND_INITIAL_RETRY_DELAY_MS = 1_000L
+        private const val BACKEND_MAX_RETRY_DELAY_MS = 30_000L
         private const val SPOT_INITIAL_RETRY_DELAY_MS = 1_000L
         private const val SPOT_MAX_RETRY_DELAY_MS = 30_000L
         private val RETRYABLE_SPOT_ERROR_CODES = setOf(

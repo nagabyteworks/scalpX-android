@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.nagabyte.scalpx.BuildConfig
+import com.nagabyte.scalpx.data.remote.ServerConfig
 /**
  * Android Keystore-backed Secure Encrypted Storage.
  * Invariant: Flattrade api_secret never touches the device.
@@ -29,7 +29,7 @@ class SecureConfigStore(context: Context) : ConfigStore {
     }
 
     override fun getServerBaseUrl(): String {
-        return normalizeUrl(BuildConfig.ENV_BASE_URL.ifBlank { DEFAULT_BASE_URL })
+        return ServerConfig.baseUrl
     }
 
     override fun setServerBaseUrl(url: String) {
@@ -93,15 +93,6 @@ class SecureConfigStore(context: Context) : ConfigStore {
         prefs.edit().putFloat(KEY_SLIPPAGE_BUFFER_PTS, pts.toFloat()).apply()
     }
 
-    private fun normalizeUrl(url: String): String {
-        var u = url.trim()
-        require(u.startsWith("https://", ignoreCase = true)) { "The scalpX backend URL must use HTTPS." }
-        while (u.endsWith("/")) {
-            u = u.substring(0, u.length - 1)
-        }
-        return u
-    }
-
     companion object {
         private const val PREFS_NAME = "scalpx_secure_config"
         private const val KEY_JWT_TOKEN = "jwt_token"
@@ -112,7 +103,6 @@ class SecureConfigStore(context: Context) : ConfigStore {
         private const val KEY_BREAKOUT_BUFFER_PTS = "preset_breakout_buffer_pts"
         private const val KEY_SLIPPAGE_BUFFER_PTS = "preset_slippage_buffer_pts"
 
-        // Production default backend URL
-        const val DEFAULT_BASE_URL = "https://trade.nagabyte.com"
+        const val DEFAULT_BASE_URL = ServerConfig.PRODUCTION_BASE_URL
     }
 }

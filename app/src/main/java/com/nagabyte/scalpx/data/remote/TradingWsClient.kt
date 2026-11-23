@@ -62,10 +62,7 @@ class TradingWsClient(
         isExplicitDisconnect = false
         reconnectJob?.cancel()
 
-        val baseUrl = configStore.getServerBaseUrl()
-            .replace("http://", "ws://")
-            .replace("https://", "wss://")
-        val wsUrl = "$baseUrl/ws"
+        val wsUrl = ServerConfig.toWebSocketUrl("${configStore.getServerBaseUrl().trimEnd('/')}/ws")
         val request = Request.Builder().url(wsUrl).build()
 
         _connectionState.value = WsConnectionState.Connecting

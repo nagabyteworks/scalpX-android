@@ -357,6 +357,50 @@ class ScalperViewModelTest {
     }
 
     @Test
+    fun `startup health-check retries temporary failures before opening the websocket`() = runTest(testDispatcher) {
+        fakeRepo.healthFailuresRemaining = 2
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+
+        runCurrent()
+        assertEquals(1, fakeRepo.healthCallCount)
+        assertEquals(0, fakeRepo.connectWebSocketCallCount)
+        assertEquals("RETRYING", viewModel.uiState.value.backendReachability)
+        assertTrue(viewModel.uiState.value.lastServerMessage.contains("backend unreachable"))
+
+        advanceTimeBy(999)
+        runCurrent()
+        assertEquals(1, fakeRepo.healthCallCount)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(2, fakeRepo.healthCallCount)
+        assertEquals(0, fakeRepo.connectWebSocketCallCount)
+
+        advanceTimeBy(1_999)
+        runCurrent()
+        assertEquals(2, fakeRepo.healthCallCount)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(3, fakeRepo.healthCallCount)
+        assertEquals(1, fakeRepo.connectWebSocketCallCount)
+        assertEquals("ONLINE", viewModel.uiState.value.backendReachability)
+        assertEquals(1, fakeRepo.indexSpotCallCount)
+    }
+
+    @Test
+    fun `startup does not retry permanent health errors or connect websocket`() = runTest(testDispatcher) {
+        fakeRepo.healthFailuresRemaining = 1
+        fakeRepo.healthFailureStatusCode = 404
+        val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
+
+        runCurrent()
+
+        assertEquals(1, fakeRepo.healthCallCount)
+        assertEquals(0, fakeRepo.connectWebSocketCallCount)
+        assertEquals("OFFLINE", viewModel.uiState.value.backendReachability)
+        assertEquals(0, fakeRepo.indexSpotCallCount)
+    }
+
+    @Test
     fun `spot retry uses capped exponential backoff and manual retry resets it`() = runTest(testDispatcher) {
         fakeRepo.waitingSpotResponses = 20
         val viewModel = ScalperViewModel(repository = fakeRepo, clock = { testCurrentTime })
@@ -461,6 +505,10 @@ class ScalperViewModelTest {
         var spotRequestDelayMs = 0L
         var activeSpotRequests = 0
         var maxConcurrentSpotRequests = 0
+        var healthCallCount = 0
+        var healthFailuresRemaining = 0
+        var healthFailureStatusCode: Int? = null
+        var connectWebSocketCallCount = 0
         var lastSubmittedFirstMilestonePaise: Long? = null
         var lastSubmittedSide: String? = null
         var lastPatchedToken: String? = null
@@ -485,6 +533,7 @@ class ScalperViewModelTest {
         override val pingMs = testPing
 
         override fun connectWebSocket() {
+            connectWebSocketCallCount++
             testSnapshotFlow.value = marketSnapshot().copy(marketData = null)
         }
 
@@ -544,6 +593,11 @@ class ScalperViewModelTest {
         }
 
         override suspend fun checkHealth(): ApiResult<HealthDto> {
+            healthCallCount++
+            if (healthFailuresRemaining > 0) {
+                healthFailuresRemaining--
+                return ApiResult.Error("Connection refused", statusCode = healthFailureStatusCode)
+            }
             return ApiResult.Success(
                 HealthDto(
                     status = "ok",
